@@ -1,0 +1,99 @@
+# Passive audit of industrial traffic
+
+**Engagement.** {{ report.scope.engagement }}
+**Authorisation.** {{ report.scope.authorized_by }}, reference {{ report.scope.reference }}
+**Authorised window.** {{ report.scope.window.start.isoformat() }} to {{ report.scope.window.end.isoformat() }}
+**Report generated.** {{ report.generated_at.isoformat(timespec="seconds") }}
+
+{% if report.scope.notes %}
+{{ report.scope.notes }}
+
+{% endif %}
+## Capture
+
+| | |
+| --- | --- |
+| File | `{{ report.capture.path }}` |
+| First packet | {{ report.capture.started_at.isoformat() if report.capture.started_at else "n/a" }} |
+| Last packet | {{ report.capture.ended_at.isoformat() if report.capture.ended_at else "n/a" }} |
+| Duration | {{ report | duration }} |
+| TCP segments | {{ report.capture.packets }} |
+| Industrial frames | {{ report.capture.industrial_frames }} |
+| Truncated records | {{ report.capture.truncated_records }} |
+| Stream gaps | {{ report.capture.stream_gaps }} |
+| Within authorised window | {{ "yes" if report.capture.within_window else "no" }} |
+
+{% if report.capture.truncated_records or report.capture.stream_gaps %}
+The capture is incomplete: {{ report.capture.truncated_records }} records were cut by the
+snapshot length and {{ report.capture.stream_gaps }} stream gaps were detected. Frames lost this
+way are absent from the inventory below, so treat it as a lower bound.
+
+{% endif %}
+## Devices
+
+{% if report.devices %}
+| Address | Role | Protocol | Unit IDs | Identification | Other services | Scope |
+| --- | --- | --- | --- | --- | --- | --- |
+{% for device in report.devices %}
+| {{ device.address }} | {{ device.roles | join(", ") }} | {{ device.protocols | map(attribute="value") | join(", ") or "-" }} | {{ device.unit_ids | join(", ") or "-" }} | {{ device.identification.values() | join(" / ") or "-" }} | {{ device.other_ports | join(", ") or "-" }} | {{ "in" if device.in_scope else ("excluded" if device.excluded else "outside") }} |
+{% endfor %}
+{% else %}
+No device was observed.
+{% endif %}
+
+## Exchanges
+
+{% if report.conversations %}
+| Client | Server | Protocol | Requests | Responses | Writes | Exceptions | Mean interval |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+{% for item in report.conversations %}
+| {{ item.client }} | {{ item.server }}:{{ item.port }} | {{ item.protocol.value }} | {{ item.requests }} | {{ item.responses }} | {{ item.writes }} | {{ item.exception_count }} | {{ "%.0f ms" | format(item.mean_interval_ms) if item.mean_interval_ms else "-" }} |
+{% endfor %}
+
+{% for item in report.conversations %}
+{% if item.functions %}
+- `{{ item.client }} -> {{ item.server }}:{{ item.port }}`: {% for name, count in item.functions.items() %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}
+
+{% endif %}
+{% endfor %}
+{% else %}
+No industrial exchange was decoded.
+{% endif %}
+
+## Findings
+
+{% if report.findings %}
+{% for finding in report.findings %}
+### {{ finding.identifier }} - {{ finding.title }}
+
+**Severity.** {{ finding.severity.value }}
+{% if finding.assets %}
+**Assets.** {{ finding.assets | join(", ") }}
+{% endif %}
+{% if finding.iec_62443 or finding.anssi %}
+**References.** {{ (finding.iec_62443 + finding.anssi) | join(" / ") }}
+{% endif %}
+
+Observed:
+
+{% for line in finding.evidence %}
+- {{ line }}
+{% endfor %}
+
+{{ finding.recommendation }}
+
+{% endfor %}
+{% else %}
+No finding was raised by the rule set.
+{% endif %}
+
+## Method and limits
+
+The capture was read offline. No frame was emitted towards the audited network,
+so nothing in this report required interaction with a device in production.
+
+What this implies for the reader: the report describes traffic seen during the
+window above, and nothing else. A device that was silent does not appear. A
+service that was not used does not appear. Absence of a finding is absence of
+evidence, not evidence of absence, and the sections above should be read
+alongside the configuration review and the interviews, never on their own.

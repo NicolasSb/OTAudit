@@ -1,0 +1,14 @@
+# Example scope file. Copy it, fill it in, have it signed before the capture.
+engagement: "Passive audit - Site A control network"
+authorized_by: "J. Martin, maintenance manager"
+reference: "BC-2026-014"
+notes: >
+  Capture taken on the mirrored port of the control switch, no injection.
+  Supervision and engineering VLANs only.
+window:
+  start: "2023-11-14T20:00:00+00:00"
+  end: "2023-11-15T02:00:00+00:00"
+targets:
+  - 10.42.7.0/26
+exclusions:
+  - 10.42.7.13/32   # safety PLC, out of scope by agreement

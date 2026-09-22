@@ -1,0 +1,394 @@
+{
+  "scope": {
+    "engagement": "Passive audit - Site A control network",
+    "authorized_by": "J. Martin, maintenance manager",
+    "reference": "BC-2026-014",
+    "window": {
+      "start": "2023-11-14T20:00:00Z",
+      "end": "2023-11-15T02:00:00Z"
+    },
+    "targets": [
+      "10.42.7.0/26"
+    ],
+    "exclusions": [
+      "10.42.7.13/32"
+    ],
+    "notes": "Capture taken on the mirrored port of the control switch, no injection. Supervision and engineering VLANs only.\n"
+  },
+  "capture": {
+    "path": "samples/demo.pcap",
+    "started_at": "2023-11-14T22:13:20Z",
+    "ended_at": "2023-11-14T22:13:53.419000Z",
+    "packets": 255,
+    "industrial_frames": 253,
+    "truncated_records": 0,
+    "stream_gaps": 0,
+    "within_window": true
+  },
+  "devices": [
+    {
+      "address": "10.42.7.10",
+      "roles": [
+        "client"
+      ],
+      "protocols": [],
+      "unit_ids": [],
+      "identification": {},
+      "in_scope": true,
+      "excluded": false,
+      "other_ports": []
+    },
+    {
+      "address": "10.42.7.11",
+      "roles": [
+        "client"
+      ],
+      "protocols": [],
+      "unit_ids": [],
+      "identification": {},
+      "in_scope": true,
+      "excluded": false,
+      "other_ports": []
+    },
+    {
+      "address": "10.42.7.20",
+      "roles": [
+        "server"
+      ],
+      "protocols": [
+        "modbus"
+      ],
+      "unit_ids": [
+        1
+      ],
+      "identification": {},
+      "in_scope": true,
+      "excluded": false,
+      "other_ports": [
+        23
+      ]
+    },
+    {
+      "address": "10.42.7.21",
+      "roles": [
+        "server"
+      ],
+      "protocols": [
+        "modbus"
+      ],
+      "unit_ids": [
+        1
+      ],
+      "identification": {
+        "product": "TM241CE40R",
+        "revision": "5.1.9.9",
+        "vendor": "Schneider Electric"
+      },
+      "in_scope": true,
+      "excluded": false,
+      "other_ports": []
+    },
+    {
+      "address": "10.42.7.22",
+      "roles": [
+        "server"
+      ],
+      "protocols": [
+        "modbus"
+      ],
+      "unit_ids": [
+        1
+      ],
+      "identification": {},
+      "in_scope": true,
+      "excluded": false,
+      "other_ports": []
+    },
+    {
+      "address": "10.42.7.30",
+      "roles": [
+        "server"
+      ],
+      "protocols": [
+        "s7comm"
+      ],
+      "unit_ids": [],
+      "identification": {
+        "article_number": "6ES7 214-1AG40-0XB0",
+        "module_type": "CPU 1214C DC/DC/DC",
+        "plc_name": "LINE2_CPU"
+      },
+      "in_scope": true,
+      "excluded": false,
+      "other_ports": []
+    },
+    {
+      "address": "10.42.9.80",
+      "roles": [
+        "client"
+      ],
+      "protocols": [],
+      "unit_ids": [],
+      "identification": {},
+      "in_scope": false,
+      "excluded": false,
+      "other_ports": []
+    }
+  ],
+  "conversations": [
+    {
+      "client": "10.42.7.10",
+      "server": "10.42.7.20",
+      "port": 502,
+      "protocol": "modbus",
+      "requests": 41,
+      "responses": 41,
+      "writes": 1,
+      "controls": 0,
+      "unit_ids": [
+        1
+      ],
+      "functions": {
+        "read holding registers": 40,
+        "write multiple registers": 1
+      },
+      "exceptions": {},
+      "first_seen": "2023-11-14T22:13:20Z",
+      "last_seen": "2023-11-14T22:13:50.005000Z",
+      "mean_interval_ms": 750.0,
+      "jitter_ms": 0.0
+    },
+    {
+      "client": "10.42.9.80",
+      "server": "10.42.7.20",
+      "port": 502,
+      "protocol": "modbus",
+      "requests": 1,
+      "responses": 1,
+      "writes": 1,
+      "controls": 0,
+      "unit_ids": [
+        1
+      ],
+      "functions": {
+        "write single register": 1
+      },
+      "exceptions": {},
+      "first_seen": "2023-11-14T22:13:51.005000Z",
+      "last_seen": "2023-11-14T22:13:51.011000Z",
+      "mean_interval_ms": null,
+      "jitter_ms": null
+    },
+    {
+      "client": "10.42.7.10",
+      "server": "10.42.7.21",
+      "port": 502,
+      "protocol": "modbus",
+      "requests": 41,
+      "responses": 41,
+      "writes": 0,
+      "controls": 0,
+      "unit_ids": [
+        1
+      ],
+      "functions": {
+        "encapsulated interface transport": 1,
+        "read holding registers": 40
+      },
+      "exceptions": {},
+      "first_seen": "2023-11-14T22:13:20.250000Z",
+      "last_seen": "2023-11-14T22:13:51.519000Z",
+      "mean_interval_ms": 781.525,
+      "jitter_ms": 196.874
+    },
+    {
+      "client": "10.42.7.10",
+      "server": "10.42.7.22",
+      "port": 502,
+      "protocol": "modbus",
+      "requests": 40,
+      "responses": 40,
+      "writes": 0,
+      "controls": 0,
+      "unit_ids": [
+        1
+      ],
+      "functions": {
+        "read holding registers": 40
+      },
+      "exceptions": {
+        "illegal data address": 20
+      },
+      "first_seen": "2023-11-14T22:13:20.500000Z",
+      "last_seen": "2023-11-14T22:13:49.754000Z",
+      "mean_interval_ms": 750.0,
+      "jitter_ms": 0.0
+    },
+    {
+      "client": "10.42.7.11",
+      "server": "10.42.7.30",
+      "port": 102,
+      "protocol": "s7comm",
+      "requests": 3,
+      "responses": 4,
+      "writes": 1,
+      "controls": 0,
+      "unit_ids": [],
+      "functions": {
+        "cpu services": 1,
+        "setup communication": 1,
+        "write variable": 1
+      },
+      "exceptions": {},
+      "first_seen": "2023-11-14T22:13:52.019000Z",
+      "last_seen": "2023-11-14T22:13:52.869000Z",
+      "mean_interval_ms": 415.0,
+      "jitter_ms": 205.0
+    }
+  ],
+  "findings": [
+    {
+      "identifier": "OT-003",
+      "title": "Several hosts write to the same device",
+      "severity": "high",
+      "assets": [
+        "10.42.7.20"
+      ],
+      "evidence": [
+        "10.42.7.20 written by 10.42.7.10, 10.42.9.80"
+      ],
+      "iec_62443": [
+        "CR 2.1"
+      ],
+      "anssi": [
+        "Mesure 12 (gestion des droits)"
+      ],
+      "recommendation": "Identify each writer and the reason it exists. A second master is usually a maintenance laptop or a supervision station left connected after commissioning; concurrent writes to the same registers also cause process incidents that are hard to attribute."
+    },
+    {
+      "identifier": "OT-008",
+      "title": "Legacy management services reachable on the control segment",
+      "severity": "high",
+      "assets": [
+        "10.42.7.20"
+      ],
+      "evidence": [
+        "10.42.7.20: telnet/23"
+      ],
+      "iec_62443": [
+        "CR 1.1",
+        "CR 4.1",
+        "CR 7.6"
+      ],
+      "anssi": [
+        "Mesure 14 (durcissement)",
+        "Mesure 19 (protocoles)"
+      ],
+      "recommendation": "Disable the services that are not required for operation. Where an HMI or a gateway genuinely needs them, restrict the source addresses and stop using the ones that carry credentials in clear."
+    },
+    {
+      "identifier": "OT-001",
+      "title": "Control traffic carried without authentication or integrity protection",
+      "severity": "medium",
+      "assets": [
+        "10.42.7.20",
+        "10.42.7.21",
+        "10.42.7.22",
+        "10.42.7.30"
+      ],
+      "evidence": [
+        "modbus observed in clear text on the mirrored segment",
+        "s7comm observed in clear text on the mirrored segment"
+      ],
+      "iec_62443": [
+        "CR 3.1",
+        "CR 4.1"
+      ],
+      "anssi": [
+        "Mesure 15 (cloisonnement)",
+        "Mesure 19 (protocoles)"
+      ],
+      "recommendation": "Neither Modbus/TCP nor S7comm carries authentication. Compensate at the network layer: dedicated VLAN, filtering between the control segment and everything else, and no route from office IT to port 502 or 102."
+    },
+    {
+      "identifier": "OT-002",
+      "title": "Write operations observed on the control network",
+      "severity": "medium",
+      "assets": [
+        "10.42.7.20",
+        "10.42.7.30"
+      ],
+      "evidence": [
+        "10.42.7.10 -> 10.42.7.20:502 - 1 write requests",
+        "10.42.9.80 -> 10.42.7.20:502 - 1 write requests",
+        "10.42.7.11 -> 10.42.7.30:102 - 1 write requests"
+      ],
+      "iec_62443": [
+        "CR 1.2",
+        "CR 2.1"
+      ],
+      "anssi": [
+        "Mesure 12 (gestion des droits)"
+      ],
+      "recommendation": "Confirm with the operator that each writing host is a legitimate controller. Any host able to reach port 502 or 102 can issue the same requests, so the control list is whatever the firewall allows, not what the application intends."
+    },
+    {
+      "identifier": "OT-005",
+      "title": "Industrial hosts seen outside the declared target ranges",
+      "severity": "medium",
+      "assets": [
+        "10.42.9.80"
+      ],
+      "evidence": [
+        "10.42.9.80 (client) not covered by scope targets"
+      ],
+      "iec_62443": [
+        "CR 1.2"
+      ],
+      "anssi": [
+        "Mesure 1 (cartographie)"
+      ],
+      "recommendation": "The asset inventory used to write the scope does not match the traffic. Reconcile before drawing any conclusion from the rest of this report: an audit that missed a device also missed its exposure."
+    },
+    {
+      "identifier": "OT-007",
+      "title": "Recurrent protocol exceptions",
+      "severity": "low",
+      "assets": [
+        "10.42.7.22"
+      ],
+      "evidence": [
+        "10.42.7.10 -> 10.42.7.22:502 - 50% of responses are exceptions (illegal data address x20)"
+      ],
+      "iec_62443": [
+        "CR 7.2"
+      ],
+      "anssi": [
+        "Mesure 17 (journalisation)"
+      ],
+      "recommendation": "Persistent exceptions usually mean a supervision template polling addresses that no longer exist. Harmless in itself, it consumes cycles on the device and hides genuine faults in the logs."
+    },
+    {
+      "identifier": "OT-009",
+      "title": "Devices disclose model and firmware to any peer",
+      "severity": "low",
+      "assets": [
+        "10.42.7.21",
+        "10.42.7.30"
+      ],
+      "evidence": [
+        "10.42.7.21: product=TM241CE40R, revision=5.1.9.9, vendor=Schneider Electric",
+        "10.42.7.30: article_number=6ES7 214-1AG40-0XB0, module_type=CPU 1214C DC/DC/DC, plc_name=LINE2_CPU"
+      ],
+      "iec_62443": [
+        "CR 1.2"
+      ],
+      "anssi": [
+        "Mesure 1 (cartographie)",
+        "Mesure 20 (veille vulnérabilités)"
+      ],
+      "recommendation": "Identification cannot be turned off on these protocols, and it is useful to you as much as to an attacker. Use it: match each order number and firmware version against the CISA ICS advisories and the vendor bulletins, and record the result in the asset inventory."
+    }
+  ],
+  "generated_at": "2026-09-21T11:47:06.696273Z"
+}

@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "otaudit"
+version = "0.1.0"
+description = "Passive audit of Modbus/TCP and S7comm traffic captures"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Nicolas Sourbier" }]
+keywords = ["modbus", "s7comm", "ics", "ot-security", "iec-62443", "pcap"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Security",
+]
+dependencies = [
+    "pydantic>=2.6",
+    "PyYAML>=6.0",
+    "Jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[project.scripts]
+otaudit = "otaudit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/otaudit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+ignore_errors = true
+
+[tool.coverage.run]
+source = ["otaudit"]
+branch = true

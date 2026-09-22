@@ -1,0 +1,178 @@
+{
+  "etude": "Passive audit - Site A control network",
+  "reference": "BC-2026-014",
+  "atelier": 4,
+  "source": "otaudit passive capture analysis",
+  "modes_operatoires": [
+    {
+      "identifiant": "OT-003",
+      "libelle": "Several hosts write to the same device",
+      "biens_supports": [
+        "10.42.7.20"
+      ],
+      "constats": [
+        "10.42.7.20 written by 10.42.7.10, 10.42.9.80"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 2.1"
+        ],
+        "anssi": [
+          "Mesure 12 (gestion des droits)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-008",
+      "libelle": "Legacy management services reachable on the control segment",
+      "biens_supports": [
+        "10.42.7.20"
+      ],
+      "constats": [
+        "10.42.7.20: telnet/23"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 1.1",
+          "CR 4.1",
+          "CR 7.6"
+        ],
+        "anssi": [
+          "Mesure 14 (durcissement)",
+          "Mesure 19 (protocoles)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-001",
+      "libelle": "Control traffic carried without authentication or integrity protection",
+      "biens_supports": [
+        "10.42.7.20",
+        "10.42.7.21",
+        "10.42.7.22",
+        "10.42.7.30"
+      ],
+      "constats": [
+        "modbus observed in clear text on the mirrored segment",
+        "s7comm observed in clear text on the mirrored segment"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 3.1",
+          "CR 4.1"
+        ],
+        "anssi": [
+          "Mesure 15 (cloisonnement)",
+          "Mesure 19 (protocoles)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-002",
+      "libelle": "Write operations observed on the control network",
+      "biens_supports": [
+        "10.42.7.20",
+        "10.42.7.30"
+      ],
+      "constats": [
+        "10.42.7.10 -> 10.42.7.20:502 - 1 write requests",
+        "10.42.9.80 -> 10.42.7.20:502 - 1 write requests",
+        "10.42.7.11 -> 10.42.7.30:102 - 1 write requests"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 1.2",
+          "CR 2.1"
+        ],
+        "anssi": [
+          "Mesure 12 (gestion des droits)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-005",
+      "libelle": "Industrial hosts seen outside the declared target ranges",
+      "biens_supports": [
+        "10.42.9.80"
+      ],
+      "constats": [
+        "10.42.9.80 (client) not covered by scope targets"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 1.2"
+        ],
+        "anssi": [
+          "Mesure 1 (cartographie)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-007",
+      "libelle": "Recurrent protocol exceptions",
+      "biens_supports": [
+        "10.42.7.22"
+      ],
+      "constats": [
+        "10.42.7.10 -> 10.42.7.22:502 - 50% of responses are exceptions (illegal data address x20)"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 7.2"
+        ],
+        "anssi": [
+          "Mesure 17 (journalisation)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-009",
+      "libelle": "Devices disclose model and firmware to any peer",
+      "biens_supports": [
+        "10.42.7.21",
+        "10.42.7.30"
+      ],
+      "constats": [
+        "10.42.7.21: product=TM241CE40R, revision=5.1.9.9, vendor=Schneider Electric",
+        "10.42.7.30: article_number=6ES7 214-1AG40-0XB0, module_type=CPU 1214C DC/DC/DC, plc_name=LINE2_CPU"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 1.2"
+        ],
+        "anssi": [
+          "Mesure 1 (cartographie)",
+          "Mesure 20 (veille vulnérabilités)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    }
+  ]
+}

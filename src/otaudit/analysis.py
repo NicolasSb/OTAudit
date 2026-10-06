@@ -165,10 +165,19 @@ class Analyser:
             self._devices[server].identification.update(message.identification)
 
     def _note_other_service(self, segment: net.Segment) -> None:
-        service_port = segment.destination_port
-        if service_port not in LEGACY_SERVICES:
+        # Only the server side proves a service exists: a SYN to a closed port, or one
+        # answered by a reset, says something about the client, not the host. The lower
+        # port test keeps a client whose ephemeral port happens to be listed from being
+        # taken for the server.
+        service_port = segment.source_port
+        if service_port not in LEGACY_SERVICES or service_port >= segment.destination_port:
             return
-        self._devices[segment.destination].other_ports.add(service_port)
+        if segment.flags & net.RST:
+            return
+        accepted = segment.flags & (net.SYN | net.ACK) == net.SYN | net.ACK
+        if not segment.payload and not accepted:
+            return
+        self._devices[segment.source].other_ports.add(service_port)
 
     def _note_time(self, timestamp: float) -> None:
         if self.first_seen is None or timestamp < self.first_seen:

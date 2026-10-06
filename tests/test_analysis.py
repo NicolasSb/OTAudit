@@ -137,3 +137,51 @@ def test_segment_without_payload_registers_the_role(sample_scope):
 
     assert analyser.devices()[1].roles == ["server"]
     assert analyser.conversations() == []
+
+
+def _segment(source, destination, source_port, destination_port, flags, payload=b"", sequence=1):
+    return Segment(
+        timestamp=datetime(2023, 11, 14, 22, 0, tzinfo=UTC).timestamp(),
+        source=IPv4Address(source),
+        destination=IPv4Address(destination),
+        source_port=source_port,
+        destination_port=destination_port,
+        sequence=sequence,
+        flags=flags,
+        payload=payload,
+        vlan=None,
+    )
+
+
+def test_refused_connection_does_not_count_as_a_service(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 51200, 23, flags=0x02))
+    analyser.feed(_segment("10.42.7.20", "10.42.7.10", 23, 51200, flags=0x14))
+
+    assert device(analyser.devices(), "10.42.7.20").other_ports == []
+
+
+def test_unanswered_connection_attempt_does_not_count_as_a_service(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 51200, 23, flags=0x02))
+
+    assert device(analyser.devices(), "10.42.7.20").other_ports == []
+
+
+def test_accepted_connection_counts_as_a_service(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 51200, 23, flags=0x02))
+    analyser.feed(_segment("10.42.7.20", "10.42.7.10", 23, 51200, flags=0x12))
+
+    assert device(analyser.devices(), "10.42.7.20").other_ports == [23]
+
+
+def test_client_ephemeral_port_is_not_mistaken_for_a_service(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 44818, 443, flags=0x18, payload=b"x"))
+
+    assert device(analyser.devices(), "10.42.7.10").other_ports == []

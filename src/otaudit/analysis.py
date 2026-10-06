@@ -69,7 +69,6 @@ class Analyser:
         self._flows: dict[FlowKey, _Flow] = {}
         self._devices: dict[IPv4Address, _DeviceState] = defaultdict(_DeviceState)
         self._streams: dict[tuple[IPv4Address, int, IPv4Address, int], DirectionalStream] = {}
-        self._buffers: dict[tuple[IPv4Address, int, IPv4Address, int], bytearray] = {}
         self.packets = 0
         self.industrial_frames = 0
         self.truncated = 0

@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from ipaddress import IPv4Address
 
+from otaudit import net
 from otaudit.analysis import Analyser, analyse
 from otaudit.models import Protocol
 from otaudit.net import Segment
@@ -185,3 +186,54 @@ def test_client_ephemeral_port_is_not_mistaken_for_a_service(sample_scope):
     analyser.feed(_segment("10.42.7.10", "10.42.7.20", 44818, 443, flags=0x18, payload=b"x"))
 
     assert device(analyser.devices(), "10.42.7.10").other_ports == []
+
+
+def _datagram(source, destination, source_port, destination_port, payload=b"\x00"):
+    return Segment(
+        timestamp=datetime(2023, 11, 14, 22, 0, tzinfo=UTC).timestamp(),
+        source=IPv4Address(source),
+        destination=IPv4Address(destination),
+        source_port=source_port,
+        destination_port=destination_port,
+        sequence=0,
+        flags=0,
+        payload=payload,
+        vlan=None,
+        transport=net.PROTOCOL_UDP,
+    )
+
+
+def test_udp_service_answering_is_recorded(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_datagram("10.42.7.10", "10.42.7.20", 50000, 161))
+    analyser.feed(_datagram("10.42.7.20", "10.42.7.10", 161, 50000))
+
+    assert device(analyser.devices(), "10.42.7.20").other_ports == [161]
+    assert analyser.packets == 1
+
+
+def test_unanswered_udp_request_is_not_recorded(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_datagram("10.42.7.10", "10.42.7.20", 50000, 161))
+
+    assert device(analyser.devices(), "10.42.7.20").other_ports == []
+
+
+def test_tftp_answer_from_a_new_port_is_recorded(sample_scope):
+    # A TFTP server answers from a fresh port, never from 69.
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_datagram("10.42.7.10", "10.42.7.20", 50000, 69))
+    analyser.feed(_datagram("10.42.7.20", "10.42.7.10", 61234, 50000))
+
+    assert device(analyser.devices(), "10.42.7.20").other_ports == [69]
+
+
+def test_bacnet_between_equal_ports_is_recorded(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, flags=0x18))
+    analyser.feed(_datagram("10.42.7.20", "10.42.7.63", 47808, 47808))
+
+    assert device(analyser.devices(), "10.42.7.20").other_ports == [47808]

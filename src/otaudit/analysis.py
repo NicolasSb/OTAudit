@@ -34,6 +34,11 @@ LEGACY_SERVICES = {
     47808: "bacnet",
 }
 
+# Listed services that run over UDP. TFTP is kept apart because its server answers
+# from a fresh port, so the reply never carries port 69.
+LEGACY_UDP_SERVICES = frozenset({111, 161, 20000, 44818, 47808})
+TFTP_PORT = 69
+
 FlowKey = tuple[IPv4Address, IPv4Address, int, Protocol]
 
 
@@ -69,6 +74,7 @@ class Analyser:
         self._flows: dict[FlowKey, _Flow] = {}
         self._devices: dict[IPv4Address, _DeviceState] = defaultdict(_DeviceState)
         self._streams: dict[tuple[IPv4Address, int, IPv4Address, int], DirectionalStream] = {}
+        self._tftp_requests: set[tuple[IPv4Address, int, IPv4Address]] = set()
         self.packets = 0
         self.industrial_frames = 0
         self.truncated = 0
@@ -76,8 +82,11 @@ class Analyser:
         self.last_seen: float | None = None
 
     def feed(self, segment: net.Segment) -> None:
-        self.packets += 1
         self._note_time(segment.timestamp)
+        if segment.transport == net.PROTOCOL_UDP:
+            self._note_udp_service(segment)
+            return
+        self.packets += 1
         protocol = INDUSTRIAL_PORTS.get(segment.destination_port) or INDUSTRIAL_PORTS.get(
             segment.source_port
         )
@@ -178,6 +187,19 @@ class Analyser:
         if not segment.payload and not accepted:
             return
         self._devices[segment.source].other_ports.add(service_port)
+
+    def _note_udp_service(self, segment: net.Segment) -> None:
+        if segment.destination_port == TFTP_PORT:
+            self._tftp_requests.add((segment.source, segment.source_port, segment.destination))
+            return
+        if (segment.destination, segment.destination_port, segment.source) in self._tftp_requests:
+            self._devices[segment.source].other_ports.add(TFTP_PORT)
+            return
+        # As over TCP, only a datagram sent from the service port proves the service.
+        # Equal ports are allowed: BACnet devices talk from 47808 to 47808.
+        service_port = segment.source_port
+        if service_port in LEGACY_UDP_SERVICES and service_port <= segment.destination_port:
+            self._devices[segment.source].other_ports.add(service_port)
 
     def _note_time(self, timestamp: float) -> None:
         if self.first_seen is None or timestamp < self.first_seen:

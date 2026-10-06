@@ -1,4 +1,4 @@
-"""Link, network and transport decoding, down to the TCP payload."""
+"""Link, network and transport decoding, down to the TCP or UDP payload."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ ETHERTYPE_IPV4 = 0x0800
 ETHERTYPE_VLAN = 0x8100
 ETHERTYPE_QINQ = 0x88A8
 PROTOCOL_TCP = 6
+PROTOCOL_UDP = 17
 
 FIN = 0x01
 SYN = 0x02
@@ -37,6 +38,7 @@ class Segment:
     flags: int
     payload: bytes
     vlan: int | None
+    transport: int = PROTOCOL_TCP
 
     @property
     def flow(self) -> tuple[IPv4Address, int, IPv4Address, int]:
@@ -44,11 +46,12 @@ class Segment:
 
 
 def decode(record: Record, linktype: int) -> Segment | None:
-    """Return the TCP segment carried by a record, or None if there is none.
+    """Return the TCP segment or UDP datagram carried by a record, or None.
 
-    Anything that is not IPv4/TCP is skipped silently: a capture taken on a
-    control network carries ARP, STP and multicast discovery that the audit does
-    not use.
+    Anything that is not IPv4 TCP or UDP is skipped silently: a capture taken on
+    a control network carries ARP, STP and multicast discovery that the audit
+    does not use. UDP datagrams come back as segments with no sequence number
+    and no flags.
     """
     if linktype == LINKTYPE_ETHERNET:
         payload, vlan = _strip_ethernet(record.data)
@@ -94,11 +97,13 @@ def _decode_ipv4(timestamp: float, packet: bytes, vlan: int | None) -> Segment |
     if fragment & 0x1FFF:
         # Non-initial fragment: the transport header is in an earlier packet.
         return None
-    if packet[9] != PROTOCOL_TCP:
+    if packet[9] not in (PROTOCOL_TCP, PROTOCOL_UDP):
         return None
     source = IPv4Address(packet[12:16])
     destination = IPv4Address(packet[16:20])
     end = min(total_length, len(packet)) if total_length >= header_length else len(packet)
+    if packet[9] == PROTOCOL_UDP:
+        return _decode_udp(timestamp, source, destination, packet[header_length:end], vlan)
     return _decode_tcp(timestamp, source, destination, packet[header_length:end], vlan)
 
 
@@ -125,4 +130,28 @@ def _decode_tcp(
         flags=segment[13],
         payload=segment[data_offset:],
         vlan=vlan,
+    )
+
+
+def _decode_udp(
+    timestamp: float,
+    source: IPv4Address,
+    destination: IPv4Address,
+    datagram: bytes,
+    vlan: int | None,
+) -> Segment | None:
+    if len(datagram) < 8:
+        return None
+    source_port, destination_port = struct.unpack("!HH", datagram[:4])
+    return Segment(
+        timestamp=timestamp,
+        source=source,
+        destination=destination,
+        source_port=source_port,
+        destination_port=destination_port,
+        sequence=0,
+        flags=0,
+        payload=datagram[8:],
+        vlan=vlan,
+        transport=PROTOCOL_UDP,
     )

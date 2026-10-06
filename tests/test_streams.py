@@ -58,3 +58,14 @@ def test_empty_payload_is_ignored():
     stream.push(1, b"")
 
     assert stream.expected is None
+
+
+def test_restart_drops_the_buffer_but_keeps_the_gap_count():
+    stream = DirectionalStream()
+    stream.push(100, b"abc")
+    stream.push(200, b"xyz")
+    stream.restart(5000)
+    stream.push(5001, b"new")
+
+    assert bytes(stream.buffer) == b"new"
+    assert stream.gaps == 1

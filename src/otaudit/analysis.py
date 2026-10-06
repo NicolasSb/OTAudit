@@ -100,6 +100,8 @@ class Analyser:
         self._devices[client].roles.add("client")
         self._devices[server].roles.add("server")
         self._devices[server].protocols.add(protocol)
+        if segment.flags & net.SYN:
+            self._streams.setdefault(segment.flow, DirectionalStream()).restart(segment.sequence)
         if not segment.payload:
             return
         for frame in self._frames(segment, protocol):
@@ -115,8 +117,7 @@ class Analyser:
                 self._handle_s7(frame, flow, server, is_request, segment.timestamp)
 
     def _frames(self, segment: net.Segment, protocol: Protocol) -> list[bytes]:
-        key = (segment.source, segment.source_port, segment.destination, segment.destination_port)
-        stream = self._streams.setdefault(key, DirectionalStream())
+        stream = self._streams.setdefault(segment.flow, DirectionalStream())
         stream.push(segment.sequence, segment.payload)
         splitter = modbus.split_frames if protocol is Protocol.MODBUS else s7.split_frames
         return splitter(stream.buffer)

@@ -254,3 +254,29 @@ def test_host_with_nothing_to_report_is_left_out(sample_scope):
     analyser.feed(_segment("10.42.7.40", "10.42.7.11", 51200, 443, flags=0x18, payload=b"x"))
 
     assert analyser.devices() == []
+
+
+def test_reused_connection_is_not_a_stream_gap(sample_scope):
+    from otaudit.synthesis import modbus_request
+
+    request = modbus_request(1, 1, 3, b"\x00\x00\x00\x01")
+    analyser = Analyser(sample_scope)
+    for initial in (1000, 900_000):
+        analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x02, sequence=initial))
+        analyser.feed(
+            _segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x18, request, sequence=initial + 1)
+        )
+
+    assert analyser.stream_gaps == 0
+    assert conversation(analyser.conversations(), "10.42.7.10", "10.42.7.20").requests == 2
+
+
+def test_lost_first_segment_after_syn_is_a_stream_gap(sample_scope):
+    from otaudit.synthesis import modbus_request
+
+    request = modbus_request(1, 1, 3, b"\x00\x00\x00\x01")
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x02, sequence=1000))
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x18, request, sequence=1013))
+
+    assert analyser.stream_gaps == 1

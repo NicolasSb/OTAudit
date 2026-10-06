@@ -214,7 +214,9 @@ class Analyser:
     def devices(self) -> list[Device]:
         devices = []
         for address, state in self._devices.items():
-            if not state.protocols and not state.roles:
+            # A host that only exposes a legacy service is kept: a switch answering
+            # telnet on the control segment belongs in the inventory and in OT-008.
+            if not state.roles and not state.other_ports:
                 continue
             devices.append(
                 Device(

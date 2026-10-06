@@ -131,3 +131,13 @@ def test_every_finding_carries_a_recommendation(sample_capture, sample_scope):
     for finding in evaluate(capture, devices, conversations):
         assert finding.recommendation.strip()
         assert finding.evidence
+
+
+def test_non_industrial_host_outside_targets_is_not_an_undeclared_asset():
+    switch = [
+        Device(address=IPv4Address("10.42.9.1"), in_scope=False, other_ports=[23]),
+    ]
+    findings = evaluate(empty_capture(), switch, [])
+
+    assert "OT-005" not in identifiers(findings)
+    assert "OT-008" in identifiers(findings)

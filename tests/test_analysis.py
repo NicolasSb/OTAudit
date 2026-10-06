@@ -237,3 +237,20 @@ def test_bacnet_between_equal_ports_is_recorded(sample_scope):
     analyser.feed(_datagram("10.42.7.20", "10.42.7.63", 47808, 47808))
 
     assert device(analyser.devices(), "10.42.7.20").other_ports == [47808]
+
+
+def test_host_seen_only_through_a_legacy_service_is_inventoried(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.40", "10.42.7.11", 23, 51200, flags=0x18, payload=b"login: "))
+
+    switch = device(analyser.devices(), "10.42.7.40")
+    assert switch.roles == []
+    assert switch.protocols == []
+    assert switch.other_ports == [23]
+
+
+def test_host_with_nothing_to_report_is_left_out(sample_scope):
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.40", "10.42.7.11", 51200, 443, flags=0x18, payload=b"x"))
+
+    assert analyser.devices() == []

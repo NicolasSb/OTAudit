@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import net
 from .models import Capture, Conversation, Device, Protocol, Scope
-from .pcapfile import PcapReader
+from .pcapng import open_capture
 from .protocols import modbus, s7
 from .streams import DirectionalStream
 
@@ -317,11 +317,11 @@ class Analyser:
 
 def analyse(path: Path, scope: Scope) -> tuple[Capture, list[Device], list[Conversation]]:
     analyser = Analyser(scope)
-    with PcapReader(path) as reader:
+    with open_capture(path) as reader:
         for record in reader:
             if record.truncated:
                 analyser.truncated += 1
-            segment = net.decode(record, reader.linktype)
+            segment = net.decode(record, record.linktype)
             if segment is not None:
                 analyser.feed(segment)
     return analyser.capture(path), analyser.devices(), analyser.conversations()

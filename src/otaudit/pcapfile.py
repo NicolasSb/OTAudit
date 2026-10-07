@@ -3,7 +3,8 @@
 Deliberately not built on scapy or dpkt: the tool is meant to be read and
 approved by the audited party before it runs, and a hundred lines of struct
 unpacking are easier to approve than a packet manipulation framework.
-pcapng is not supported; convert with `editcap -F pcap in.pcapng out.pcap`.
+pcapng files are read by the pcapng module; `pcapng.open_capture` picks the
+right reader from the magic.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ class Record:
     timestamp: float
     data: bytes
     original_length: int
+    linktype: int = LINKTYPE_ETHERNET
 
     @property
     def truncated(self) -> bool:
@@ -74,7 +76,7 @@ class PcapReader:
         else:
             raise PcapError(
                 f"{self.path}: unknown magic {raw_magic:#010x}; "
-                "pcapng files must be converted first"
+                "pcapng files are read through open_capture"
             )
         linktype = struct.unpack(endian + "I", header[20:24])[0]
         return endian, linktype, divisor
@@ -94,6 +96,7 @@ class PcapReader:
                 timestamp=seconds + fraction / self.divisor,
                 data=payload,
                 original_length=original,
+                linktype=self.linktype,
             )
 
     def close(self) -> None:

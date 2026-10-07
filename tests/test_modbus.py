@@ -178,3 +178,57 @@ def test_truncated_umas_request_has_no_subfunction():
     assert pdu is not None
     assert pdu.subfunction is None
     assert pdu.function_name == "umas"
+
+
+def test_single_register_write_reports_its_address():
+    pdu = modbus.parse(bytes.fromhex("000f0000000601060064002a"))
+
+    assert pdu is not None
+    assert pdu.written == ("holding registers", 100, 1)
+
+
+def test_multiple_register_write_reports_its_range():
+    pdu = modbus.parse(bytes.fromhex("00100000000d011000c8000306000100020003"))
+
+    assert pdu is not None
+    assert pdu.written == ("holding registers", 200, 3)
+
+
+def test_coil_writes_report_the_coil_table():
+    single = modbus.parse(bytes.fromhex("00110000000601050010ff00"))
+    multiple = modbus.parse(bytes.fromhex("001200000009010f0020000a02ff03"))
+
+    assert single is not None and multiple is not None
+    assert single.written == ("coils", 16, 1)
+    assert multiple.written == ("coils", 32, 10)
+
+
+def test_read_write_registers_reports_the_written_range_only():
+    # Read 2 registers at 0, write 1 register at 0x0100.
+    pdu = modbus.parse(bytes.fromhex("00130000000d01170000000201000001021234"))
+
+    assert pdu is not None
+    assert pdu.written == ("holding registers", 256, 1)
+
+
+def test_mask_write_reports_one_register():
+    pdu = modbus.parse(bytes.fromhex("0014000000080116000400f20025"))
+
+    assert pdu is not None
+    assert pdu.written == ("holding registers", 4, 1)
+
+
+def test_write_response_echo_is_not_a_write():
+    pdu = modbus.parse(bytes.fromhex("001000000006011000c80003"), request=False)
+
+    assert pdu is not None
+    assert pdu.written is None
+
+
+def test_read_and_short_write_report_nothing():
+    read = modbus.parse(READ_HOLDING_REQUEST)
+    short = modbus.parse(bytes.fromhex("001500000004011000c8"))
+
+    assert read is not None and short is not None
+    assert read.written is None
+    assert short.written is None

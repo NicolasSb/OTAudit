@@ -44,6 +44,9 @@ FUNCTION_NAMES = {
 
 WRITE_FUNCTIONS = frozenset({5, 6, 15, 16, 21, 22, 23})
 
+COILS = "coils"
+HOLDING_REGISTERS = "holding registers"
+
 DIAGNOSTICS = 8
 DIAGNOSTIC_NAMES = {
     0x00: "return query data",
@@ -112,6 +115,8 @@ class Pdu:
     exception_code: int | None = None
     identification: dict[str, str] = field(default_factory=dict)
     subfunction: int | None = None
+    written: tuple[str, int, int] | None = None
+    """Table, first address and count of a write request."""
 
     @property
     def function_name(self) -> str:
@@ -206,7 +211,22 @@ def parse(frame: bytes, request: bool = True) -> Pdu | None:
         is_exception=failed,
         identification=identification,
         subfunction=subfunction,
+        written=_written(function, body) if request else None,
     )
+
+
+def _written(function: int, body: bytes) -> tuple[str, int, int] | None:
+    """Locate what a write request targets. Responses echo it and are not decoded."""
+    if function in (5, 6, 22) and len(body) >= 2:
+        table = COILS if function == 5 else HOLDING_REGISTERS
+        return table, struct.unpack("!H", body[:2])[0], 1
+    if function in (15, 16) and len(body) >= 4:
+        first, count = struct.unpack("!HH", body[:4])
+        return (COILS if function == 15 else HOLDING_REGISTERS), first, count
+    if function == 23 and len(body) >= 8:
+        first, count = struct.unpack("!HH", body[4:8])
+        return HOLDING_REGISTERS, first, count
+    return None
 
 
 def _parse_identification(body: bytes) -> dict[str, str]:

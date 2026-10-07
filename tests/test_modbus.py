@@ -92,3 +92,89 @@ def test_split_frames_resynchronises_on_garbage():
 
 def test_parse_rejects_short_frame():
     assert modbus.parse(b"\x00\x01\x00\x00") is None
+
+
+def test_diagnostics_restart_is_a_control_function():
+    pdu = modbus.parse(bytes.fromhex("000500000006010800010000"))
+
+    assert pdu is not None
+    assert pdu.subfunction == 0x0001
+    assert pdu.function_name == "diagnostics: restart communications"
+    assert pdu.is_control
+    assert not pdu.is_write
+
+
+def test_diagnostics_force_listen_only_is_a_control_function():
+    pdu = modbus.parse(bytes.fromhex("000600000006010800040000"))
+
+    assert pdu is not None
+    assert pdu.function_name == "diagnostics: force listen only mode"
+    assert pdu.is_control
+
+
+def test_diagnostics_echo_is_not_a_control_function():
+    pdu = modbus.parse(bytes.fromhex("000700000006010800001234"))
+
+    assert pdu is not None
+    assert pdu.function_name == "diagnostics: return query data"
+    assert not pdu.is_control
+
+
+def test_umas_stop_and_start_are_control_functions():
+    # Function 0x5A, session key 0x01, UMAS code.
+    stop = modbus.parse(bytes.fromhex("000800000004005a0141"))
+    start = modbus.parse(bytes.fromhex("000900000004005a0140"))
+
+    assert stop is not None and start is not None
+    assert stop.subfunction == 0x41
+    assert stop.function_name == "umas: stop plc"
+    assert start.function_name == "umas: start plc"
+    assert stop.is_control and start.is_control
+    assert not stop.is_write
+
+
+def test_umas_memory_write_and_program_download_are_writes():
+    write = modbus.parse(bytes.fromhex("000a00000005005a012100"))
+    download = modbus.parse(bytes.fromhex("000b00000005005a013000"))
+
+    assert write is not None and download is not None
+    assert write.function_name == "umas: write memory block"
+    assert download.function_name == "umas: begin download"
+    assert write.is_write and download.is_write
+    assert not download.is_control
+
+
+def test_umas_read_is_neither_write_nor_control():
+    pdu = modbus.parse(bytes.fromhex("000c00000005005a012000"))
+
+    assert pdu is not None
+    assert pdu.function_name == "umas: read memory block"
+    assert not pdu.is_write
+    assert not pdu.is_control
+
+
+def test_unknown_umas_code_falls_back_to_a_label():
+    pdu = modbus.parse(bytes.fromhex("000d00000004005a0158"))
+
+    assert pdu is not None
+    assert pdu.function_name == "umas: function 0x58"
+
+
+def test_umas_response_status_is_read_as_success_or_error():
+    # In a response the byte after the session key is a status, not a code.
+    failed = modbus.parse(bytes.fromhex("000800000004005a01fd"), request=False)
+    succeeded = modbus.parse(bytes.fromhex("000800000004005a01fe"), request=False)
+
+    assert failed is not None and succeeded is not None
+    assert failed.is_exception
+    assert failed.exception_name == "umas error"
+    assert not succeeded.is_exception
+    assert succeeded.subfunction is None
+
+
+def test_truncated_umas_request_has_no_subfunction():
+    pdu = modbus.parse(bytes.fromhex("000e00000003005a01"))
+
+    assert pdu is not None
+    assert pdu.subfunction is None
+    assert pdu.function_name == "umas"

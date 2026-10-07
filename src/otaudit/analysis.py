@@ -130,7 +130,7 @@ class Analyser:
         is_request: bool,
         timestamp: float,
     ) -> None:
-        pdu = modbus.parse(frame)
+        pdu = modbus.parse(frame, request=is_request)
         if pdu is None:
             return
         flow.unit_ids.add(pdu.unit_id)
@@ -141,6 +141,8 @@ class Analyser:
             flow.functions[pdu.function_name] += 1
             if pdu.is_write:
                 flow.writes += 1
+            if pdu.is_control:
+                flow.controls += 1
             return
         flow.responses += 1
         if pdu.is_exception and pdu.exception_name:

@@ -280,3 +280,16 @@ def test_lost_first_segment_after_syn_is_a_stream_gap(sample_scope):
     analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x18, request, sequence=1013))
 
     assert analyser.stream_gaps == 1
+
+
+def test_umas_stop_counts_as_a_control_request(sample_scope):
+    analyser = Analyser(sample_scope)
+    stop = bytes.fromhex("000800000004005a0141")
+    failed = bytes.fromhex("000800000004005a01fd")
+    analyser.feed(_segment("10.42.7.11", "10.42.7.21", 40000, 502, 0x18, stop))
+    analyser.feed(_segment("10.42.7.21", "10.42.7.11", 502, 40000, 0x18, failed))
+
+    engineering = conversation(analyser.conversations(), "10.42.7.11", "10.42.7.21")
+    assert engineering.controls == 1
+    assert engineering.functions == {"umas: stop plc": 1}
+    assert engineering.exceptions == {"umas error": 1}

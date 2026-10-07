@@ -24,6 +24,7 @@ from .models import (
     Conversation,
     Device,
     Finding,
+    Protocol,
     Severity,
 )
 
@@ -139,6 +140,13 @@ def _plc_control(
     controlling = [item for item in conversations if item.controls]
     if not controlling:
         return []
+    ports = ", ".join(str(port) for port in sorted({item.port for item in controlling}))
+    protocols = {item.protocol for item in controlling}
+    protections = []
+    if Protocol.S7COMM in protocols:
+        protections.append("the S7 CPU protection level")
+    if Protocol.MODBUS in protocols:
+        protections.append("the Modicon application password")
     return [
         Finding(
             identifier="OT-004",
@@ -152,9 +160,9 @@ def _plc_control(
             iec_62443=["CR 2.1", "CR 7.1"],
             anssi=["Mesure 12 (gestion des droits)", "Mesure 17 (journalisation)"],
             recommendation=(
-                "Start and stop requests reach the CPU with no authentication. Restrict port 102 "
-                "to the engineering station, enable the CPU protection level, and log the source "
-                "of every such request."
+                "Start, stop and restart requests reach the device with no authentication. "
+                f"Restrict port {ports} to the engineering station, enable "
+                f"{' and '.join(protections)}, and log the source of every such request."
             ),
         )
     ]

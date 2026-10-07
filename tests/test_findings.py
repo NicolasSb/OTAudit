@@ -141,3 +141,12 @@ def test_non_industrial_host_outside_targets_is_not_an_undeclared_asset():
 
     assert "OT-005" not in identifiers(findings)
     assert "OT-008" in identifiers(findings)
+
+
+def test_modbus_control_recommendation_names_the_modbus_port():
+    conversations = [make_conversation("10.42.7.11", "10.42.7.21", controls=1)]
+    findings = evaluate(empty_capture(), [], conversations)
+    control = next(item for item in findings if item.identifier == "OT-004")
+
+    assert "502" in control.recommendation
+    assert "102" not in control.recommendation

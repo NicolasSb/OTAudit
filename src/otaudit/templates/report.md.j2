@@ -35,7 +35,7 @@ way are absent from the inventory below, so treat it as a lower bound.
 | Address | Role | Protocol | Unit IDs | Identification | Other services | Scope |
 | --- | --- | --- | --- | --- | --- | --- |
 {% for device in report.devices %}
-| {{ device.address }} | {{ device.roles | join(", ") }} | {{ device.protocols | map(attribute="value") | join(", ") or "-" }} | {{ device.unit_ids | join(", ") or "-" }} | {{ device.identification.values() | join(" / ") or "-" }} | {{ device.other_ports | join(", ") or "-" }} | {{ "in" if device.in_scope else ("excluded" if device.excluded else "outside") }} |
+| {{ device.address }} | {{ device.roles | join(", ") or "-" }} | {{ device.protocols | map(attribute="value") | join(", ") or "-" }} | {{ device.unit_ids | join(", ") or "-" }} | {{ device.identification.values() | join(" / ") or "-" }} | {{ device.other_ports | join(", ") or "-" }} | {{ "in" if device.in_scope else ("excluded" if device.excluded else "outside") }} |
 {% endfor %}
 {% else %}
 No device was observed.

@@ -44,13 +44,46 @@ def test_raw_and_sll_linktypes():
     assert net.decode(record(sll), LINKTYPE_LINUX_SLL) is not None
 
 
-def test_skips_non_ipv4_and_non_tcp():
+def test_skips_non_ipv4_and_unhandled_transports():
     arp = b"\xff" * 6 + b"\x02" * 6 + b"\x08\x06" + b"\x00" * 28
     assert net.decode(record(arp), LINKTYPE_ETHERNET) is None
 
     frame = bytearray(tcp_frame("10.0.0.1", "10.0.0.2", 40000, 502, 1, b"x"))
-    frame[14 + 9] = 17  # UDP
+    frame[14 + 9] = 1  # ICMP
     assert net.decode(record(bytes(frame)), LINKTYPE_ETHERNET) is None
+
+
+def test_decodes_udp_datagram():
+    # SNMP response from 10.0.0.2:161 to 10.0.0.1:50000, raw IPv4.
+    packet = bytes.fromhex(
+        "4500001e00000000401100000a0000020a000001"  # IPv4, protocol 17, total 30
+        "00a1c350000a0000"  # UDP 161 -> 50000, length 10
+        "3000"
+    )
+    segment = net.decode(record(packet), LINKTYPE_RAW)
+
+    assert segment is not None
+    assert segment.transport == net.PROTOCOL_UDP
+    assert segment.source == IPv4Address("10.0.0.2")
+    assert segment.source_port == 161
+    assert segment.destination_port == 50000
+    assert segment.payload == b"\x30\x00"
+
+
+def test_tcp_segment_is_marked_as_tcp():
+    frame = tcp_frame("10.0.0.1", "10.0.0.2", 40000, 502, 1, b"x")
+    segment = net.decode(record(frame), LINKTYPE_ETHERNET)
+
+    assert segment is not None
+    assert segment.transport == net.PROTOCOL_TCP
+
+
+def test_short_udp_header_is_skipped():
+    packet = bytes.fromhex(
+        "4500001800000000401100000a0000020a000001"  # IPv4, protocol 17, total 24
+        "00a1c350"  # four bytes of a UDP header
+    )
+    assert net.decode(record(packet), LINKTYPE_RAW) is None
 
 
 def test_skips_non_initial_fragment():

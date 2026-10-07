@@ -164,7 +164,9 @@ def _undeclared_assets(
     capture: Capture, devices: list[Device], conversations: list[Conversation]
 ) -> list[Finding]:
     findings: list[Finding] = []
-    outside = [device for device in devices if not device.in_scope and not device.excluded]
+    outside = [
+        device for device in devices if device.roles and not device.in_scope and not device.excluded
+    ]
     if outside:
         findings.append(
             Finding(

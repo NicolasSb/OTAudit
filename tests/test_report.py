@@ -55,3 +55,13 @@ def test_out_of_scope_devices_are_listed():
     )
 
     assert [str(device.address) for device in report.out_of_scope_devices] == ["10.42.9.80"]
+
+
+def test_host_without_industrial_role_shows_a_dash():
+    from otaudit.report import render
+
+    report = report_lasting(timedelta(seconds=1)).model_copy(
+        update={"devices": [Device(address=IPv4Address("10.42.7.40"), other_ports=[23])]}
+    )
+
+    assert "| 10.42.7.40 | - |" in render(report)

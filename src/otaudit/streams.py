@@ -43,6 +43,11 @@ class DirectionalStream:
         self.buffer += payload
         self.expected = _wrap(sequence + len(payload))
 
+    def restart(self, initial_sequence: int) -> None:
+        """Start over on a SYN: a 4-tuple reused by a new connection has a new ISN."""
+        self.buffer.clear()
+        self.expected = _wrap(initial_sequence + 1)
+
     def take(self, count: int) -> bytes:
         taken = bytes(self.buffer[:count])
         del self.buffer[:count]

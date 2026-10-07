@@ -293,3 +293,32 @@ def test_umas_stop_counts_as_a_control_request(sample_scope):
     assert engineering.controls == 1
     assert engineering.functions == {"umas: stop plc": 1}
     assert engineering.exceptions == {"umas error": 1}
+
+
+def test_written_ranges_are_merged_per_unit_and_table(sample_scope):
+    from otaudit.synthesis import modbus_request
+
+    analyser = Analyser(sample_scope)
+    writes = [
+        modbus_request(1, 1, 6, b"\x00\x64\x00\x01"),
+        modbus_request(2, 1, 6, b"\x00\x65\x00\x01"),
+        modbus_request(3, 1, 16, b"\x00\xc8\x00\x03\x06" + b"\x00" * 6),
+        modbus_request(4, 1, 6, b"\x00\x64\x00\x02"),
+        modbus_request(5, 2, 5, b"\x00\x10\xff\x00"),
+    ]
+    sequence = 1
+    for frame in writes:
+        analyser.feed(
+            _segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x18, frame, sequence=sequence)
+        )
+        sequence += len(frame)
+
+    polling = conversation(analyser.conversations(), "10.42.7.10", "10.42.7.20")
+    assert polling.written == {
+        "unit 1 holding registers": [(100, 101), (200, 202)],
+        "unit 2 coils": [(16, 16)],
+    }
+    assert polling.written_ranges == [
+        "unit 1 holding registers 100-101, 200-202",
+        "unit 2 coils 16",
+    ]

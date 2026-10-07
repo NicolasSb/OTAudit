@@ -53,6 +53,9 @@ class _Flow:
     functions: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     exceptions: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     request_times: list[float] = field(default_factory=list)
+    written: dict[tuple[int, str], set[tuple[int, int]]] = field(
+        default_factory=lambda: defaultdict(set)
+    )
     first_seen: float = 0.0
     last_seen: float = 0.0
 
@@ -143,6 +146,9 @@ class Analyser:
                 flow.writes += 1
             if pdu.is_control:
                 flow.controls += 1
+            if pdu.written and pdu.written[2] > 0:
+                table, first, count = pdu.written
+                flow.written[(pdu.unit_id, table)].add((first, first + count - 1))
             return
         flow.responses += 1
         if pdu.is_exception and pdu.exception_name:
@@ -256,6 +262,10 @@ class Analyser:
                     last_seen=_moment(flow.last_seen),
                     mean_interval_ms=mean,
                     jitter_ms=jitter,
+                    written={
+                        f"unit {unit} {table}": merge_ranges(ranges)
+                        for (unit, table), ranges in sorted(flow.written.items())
+                    },
                 )
             )
         return sorted(conversations, key=lambda item: (item.server, item.client, item.port))
@@ -288,6 +298,17 @@ def analyse(path: Path, scope: Scope) -> tuple[Capture, list[Device], list[Conve
             if segment is not None:
                 analyser.feed(segment)
     return analyser.capture(path), analyser.devices(), analyser.conversations()
+
+
+def merge_ranges(ranges: set[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Merge inclusive ranges that overlap or touch."""
+    merged: list[tuple[int, int]] = []
+    for first, last in sorted(ranges):
+        if merged and first <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], last))
+        else:
+            merged.append((first, last))
+    return merged
 
 
 def _interval_statistics(times: list[float]) -> tuple[float | None, float | None]:

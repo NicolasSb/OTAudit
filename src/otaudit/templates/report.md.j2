@@ -52,7 +52,9 @@ No device was observed.
 
 {% for item in report.conversations %}
 {% if item.functions %}
-- `{{ item.client }} -> {{ item.server }}:{{ item.port }}`: {% for name, count in item.functions.items() %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}
+- `{{ item.client }} -> {{ item.server }}:{{ item.port }}`: {% for name, count in item.functions.items() %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}{% if item.written_ranges %}
+
+  - written: {{ item.written_ranges | join("; ") }}{% endif %}
 
 {% endif %}
 {% endfor %}

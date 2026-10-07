@@ -65,3 +65,24 @@ def test_host_without_industrial_role_shows_a_dash():
     )
 
     assert "| 10.42.7.40 | - |" in render(report)
+
+
+def test_written_ranges_are_listed_under_the_exchanges():
+    from otaudit.models import Conversation, Protocol
+    from otaudit.report import render
+
+    exchange = Conversation(
+        client=IPv4Address("10.42.7.10"),
+        server=IPv4Address("10.42.7.20"),
+        port=502,
+        protocol=Protocol.MODBUS,
+        requests=1,
+        writes=1,
+        functions={"write single register": 1},
+        written={"unit 1 holding registers": [(100, 101)]},
+        first_seen=START,
+        last_seen=START,
+    )
+    report = report_lasting(timedelta(seconds=1)).model_copy(update={"conversations": [exchange]})
+
+    assert "written: unit 1 holding registers 100-101" in render(report)

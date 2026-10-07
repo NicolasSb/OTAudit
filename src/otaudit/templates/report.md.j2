@@ -44,10 +44,10 @@ No device was observed.
 ## Exchanges
 
 {% if report.conversations %}
-| Client | Server | Protocol | Requests | Responses | Writes | Exceptions | Mean interval |
-| --- | --- | --- | --- | --- | --- | --- | --- |
+| Client | Server | Protocol | Requests | Responses | Writes | Exceptions | Mean interval | Unanswered | Response time |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 {% for item in report.conversations %}
-| {{ item.client }} | {{ item.server }}:{{ item.port }} | {{ item.protocol.value }} | {{ item.requests }} | {{ item.responses }} | {{ item.writes }} | {{ item.exception_count }} | {{ "%.0f ms" | format(item.mean_interval_ms) if item.mean_interval_ms else "-" }} |
+| {{ item.client }} | {{ item.server }}:{{ item.port }} | {{ item.protocol.value }} | {{ item.requests }} | {{ item.responses }} | {{ item.writes }} | {{ item.exception_count }} | {{ "%.0f ms" | format(item.mean_interval_ms) if item.mean_interval_ms else "-" }} | {{ item.unanswered }} | {{ "%.1f ms (max %.1f)" | format(item.response_ms_mean, item.response_ms_max) if item.response_ms_mean is not none else "-" }} |
 {% endfor %}
 
 {% for item in report.conversations %}

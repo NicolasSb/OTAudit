@@ -59,7 +59,7 @@ def test_exceptions_are_counted(sample_capture, sample_scope):
     _, _, conversations = analyse(sample_capture, sample_scope)
     noisy = conversation(conversations, "10.42.7.10", "10.42.7.22")
 
-    assert noisy.exceptions == {"illegal data address": 20}
+    assert noisy.exceptions == {"illegal data address on read holding registers": 20}
     assert noisy.exception_ratio == 0.5
 
 
@@ -140,9 +140,11 @@ def test_segment_without_payload_registers_the_role(sample_scope):
     assert analyser.conversations() == []
 
 
-def _segment(source, destination, source_port, destination_port, flags, payload=b"", sequence=1):
+def _segment(
+    source, destination, source_port, destination_port, flags, payload=b"", sequence=1, at=0.0
+):
     return Segment(
-        timestamp=datetime(2023, 11, 14, 22, 0, tzinfo=UTC).timestamp(),
+        timestamp=datetime(2023, 11, 14, 22, 0, tzinfo=UTC).timestamp() + at,
         source=IPv4Address(source),
         destination=IPv4Address(destination),
         source_port=source_port,
@@ -292,7 +294,7 @@ def test_umas_stop_counts_as_a_control_request(sample_scope):
     engineering = conversation(analyser.conversations(), "10.42.7.11", "10.42.7.21")
     assert engineering.controls == 1
     assert engineering.functions == {"umas: stop plc": 1}
-    assert engineering.exceptions == {"umas error": 1}
+    assert engineering.exceptions == {"umas error on umas: stop plc": 1}
 
 
 def test_written_ranges_are_merged_per_unit_and_table(sample_scope):
@@ -322,3 +324,48 @@ def test_written_ranges_are_merged_per_unit_and_table(sample_scope):
         "unit 1 holding registers 100-101, 200-202",
         "unit 2 coils 16",
     ]
+
+
+def test_modbus_responses_are_matched_by_transaction(sample_scope):
+    from otaudit.synthesis import modbus_request, modbus_response
+
+    analyser = Analyser(sample_scope)
+    first = modbus_request(1, 1, 3, b"\x00\x00\x00\x01")
+    second = modbus_request(2, 1, 3, b"\x00\x00\x00\x01")
+    answer = modbus_response(1, 1, 3, b"\x02\x00\x2a")
+    analyser.feed(_segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x18, first, at=0.0))
+    analyser.feed(_segment("10.42.7.20", "10.42.7.10", 502, 40000, 0x18, answer, at=0.012))
+    analyser.feed(
+        _segment("10.42.7.10", "10.42.7.20", 40000, 502, 0x18, second, sequence=13, at=1.0)
+    )
+
+    polling = conversation(analyser.conversations(), "10.42.7.10", "10.42.7.20")
+    assert polling.unanswered == 1
+    assert polling.response_ms_mean == 12.0
+    assert polling.response_ms_max == 12.0
+
+
+def test_unmatched_response_is_counted_without_a_time(sample_scope):
+    from otaudit.synthesis import modbus_response
+
+    analyser = Analyser(sample_scope)
+    answer = modbus_response(9, 1, 3, b"\x02\x00\x2a")
+    analyser.feed(_segment("10.42.7.20", "10.42.7.10", 502, 40000, 0x18, answer))
+
+    polling = conversation(analyser.conversations(), "10.42.7.10", "10.42.7.20")
+    assert polling.responses == 1
+    assert polling.unanswered == 0
+    assert polling.response_ms_mean is None
+
+
+def test_s7_responses_are_matched_by_pdu_reference(sample_scope):
+    job = bytes.fromhex("0300001302f080320100001234000200000401")
+    failed = bytes.fromhex("0300001502f0803203000012340002000081040401")
+    analyser = Analyser(sample_scope)
+    analyser.feed(_segment("10.42.7.11", "10.42.7.30", 40001, 102, 0x18, job, at=0.0))
+    analyser.feed(_segment("10.42.7.30", "10.42.7.11", 102, 40001, 0x18, failed, at=0.004))
+
+    engineering = conversation(analyser.conversations(), "10.42.7.11", "10.42.7.30")
+    assert engineering.unanswered == 0
+    assert engineering.response_ms_mean == 4.0
+    assert engineering.exceptions == {"error 0x8104 on read variable": 1}

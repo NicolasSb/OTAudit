@@ -98,6 +98,10 @@ class Conversation(BaseModel):
     last_seen: datetime
     mean_interval_ms: float | None = None
     jitter_ms: float | None = None
+    unanswered: int = 0
+    """Requests with no response; one still in flight when the capture ends counts too."""
+    response_ms_mean: float | None = None
+    response_ms_max: float | None = None
     written: dict[str, list[tuple[int, int]]] = Field(default_factory=dict)
     """Inclusive address ranges written, keyed by unit and table ("unit 1 coils")."""
 

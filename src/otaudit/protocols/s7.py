@@ -60,6 +60,7 @@ COMPONENT_FIELDS = {
 class Message:
     rosctr: int
     function: int | None
+    reference: int = 0
     identification: dict[str, str] = field(default_factory=dict)
     error_class: int | None = None
     error_code: int | None = None
@@ -117,6 +118,7 @@ def parse(frame: bytes) -> Message | None:
     if len(payload) < 10 or payload[0] != S7_PROTOCOL_ID:
         return None
     rosctr = payload[1]
+    reference = struct.unpack("!H", payload[4:6])[0]
     parameter_length, data_length = struct.unpack("!HH", payload[6:10])
     offset = 10
     error_class: int | None = None
@@ -129,7 +131,13 @@ def parse(frame: bytes) -> Message | None:
     parameter = payload[offset : offset + parameter_length]
     data = payload[offset + parameter_length : offset + parameter_length + data_length]
     if not parameter:
-        return Message(rosctr=rosctr, function=None, error_class=error_class, error_code=error_code)
+        return Message(
+            rosctr=rosctr,
+            function=None,
+            reference=reference,
+            error_class=error_class,
+            error_code=error_code,
+        )
     function = parameter[0]
     identification: dict[str, str] = {}
     if rosctr == 0x07:
@@ -137,6 +145,7 @@ def parse(frame: bytes) -> Message | None:
     return Message(
         rosctr=rosctr,
         function=function,
+        reference=reference,
         identification=identification,
         error_class=error_class,
         error_code=error_code,

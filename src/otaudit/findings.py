@@ -17,14 +17,16 @@ from collections import defaultdict
 from collections.abc import Callable
 from ipaddress import IPv4Address
 
-from .analysis import LEGACY_SERVICES
+from .analysis import LEGACY_SERVICES, merge_ranges
 from .models import (
     SEVERITY_ORDER,
     Capture,
     Conversation,
     Device,
     Finding,
+    Protocol,
     Severity,
+    format_ranges,
 )
 
 EXCEPTION_RATIO_THRESHOLD = 0.05
@@ -80,6 +82,7 @@ def _write_operations(
         return []
     evidence = [
         f"{item.client} -> {item.server}:{item.port} - {item.writes} write requests"
+        + (f" ({'; '.join(item.written_ranges)})" if item.written_ranges else "")
         for item in writing
     ]
     return [
@@ -110,10 +113,10 @@ def _multiple_masters(
     contested = {server: clients for server, clients in writers.items() if len(clients) > 1}
     if not contested:
         return []
-    evidence = [
-        f"{server} written by {', '.join(str(client) for client in sorted(clients))}"
-        for server, clients in sorted(contested.items())
-    ]
+    evidence = []
+    for server, clients in sorted(contested.items()):
+        evidence.append(f"{server} written by {', '.join(str(c) for c in sorted(clients))}")
+        evidence.extend(_shared_registers(server, sorted(clients), conversations))
     return [
         Finding(
             identifier="OT-003",
@@ -133,12 +136,54 @@ def _multiple_masters(
     ]
 
 
+def _shared_registers(
+    server: IPv4Address, clients: list[IPv4Address], conversations: list[Conversation]
+) -> list[str]:
+    """Say which registers several writers have in common, when the ranges are known."""
+    written: dict[IPv4Address, dict[str, set[tuple[int, int]]]] = {
+        client: defaultdict(set) for client in clients
+    }
+    for item in conversations:
+        if item.server == server and item.client in written:
+            for target, ranges in item.written.items():
+                written[item.client][target].update(ranges)
+    lines = []
+    for index, first in enumerate(clients):
+        for second in clients[index + 1 :]:
+            for target in sorted(written[first].keys() & written[second].keys()):
+                shared = _intersection(written[first][target], written[second][target])
+                if shared:
+                    lines.append(
+                        f"{first} and {second} both write {target} {format_ranges(shared)}"
+                    )
+    if not lines and all(written[client] for client in clients):
+        lines.append(f"{server}: no register is written by more than one host")
+    return lines
+
+
+def _intersection(left: set[tuple[int, int]], right: set[tuple[int, int]]) -> list[tuple[int, int]]:
+    shared = {
+        (max(a_first, b_first), min(a_last, b_last))
+        for a_first, a_last in left
+        for b_first, b_last in right
+        if max(a_first, b_first) <= min(a_last, b_last)
+    }
+    return merge_ranges(shared)
+
+
 def _plc_control(
     capture: Capture, devices: list[Device], conversations: list[Conversation]
 ) -> list[Finding]:
     controlling = [item for item in conversations if item.controls]
     if not controlling:
         return []
+    ports = ", ".join(str(port) for port in sorted({item.port for item in controlling}))
+    protocols = {item.protocol for item in controlling}
+    protections = []
+    if Protocol.S7COMM in protocols:
+        protections.append("the S7 CPU protection level")
+    if Protocol.MODBUS in protocols:
+        protections.append("the Modicon application password")
     return [
         Finding(
             identifier="OT-004",
@@ -152,9 +197,9 @@ def _plc_control(
             iec_62443=["CR 2.1", "CR 7.1"],
             anssi=["Mesure 12 (gestion des droits)", "Mesure 17 (journalisation)"],
             recommendation=(
-                "Start and stop requests reach the CPU with no authentication. Restrict port 102 "
-                "to the engineering station, enable the CPU protection level, and log the source "
-                "of every such request."
+                "Start, stop and restart requests reach the device with no authentication. "
+                f"Restrict port {ports} to the engineering station, enable "
+                f"{' and '.join(protections)}, and log the source of every such request."
             ),
         )
     ]

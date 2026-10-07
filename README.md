@@ -20,7 +20,6 @@ network, who talks to whom, and who is allowed to write.
   likelihood fields, because a capture cannot tell you what the process does.
 - Modbus/TCP and S7comm only. Not DNP3, not EtherNet/IP, not OPC UA, not
   Profinet. Serial Modbus is out of reach by construction.
-- pcapng is not read. Convert first: `editcap -F pcap in.pcapng out.pcap`.
 
 ## Install
 
@@ -90,10 +89,10 @@ to whoever signs the report.
 
 ## Design notes
 
-The capture is decoded in-house, from the pcap header down to the Modbus PDU,
-rather than through scapy or dpkt. The reason is practical: before this runs on
-a client network, someone on the client side may want to read it, and a few
-hundred lines of struct unpacking can be read in an afternoon.
+The capture is decoded in-house, from the pcap or pcapng header down to the
+Modbus PDU, rather than through scapy or dpkt. The reason is practical: before
+this runs on a client network, someone on the client side may want to read it,
+and a few hundred lines of struct unpacking can be read in an afternoon.
 
 TCP reassembly handles retransmissions and duplicates, and resynchronises on a
 gap rather than splicing bytes that never followed each other. A mirrored port

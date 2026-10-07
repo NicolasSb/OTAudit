@@ -91,3 +91,11 @@ def test_unknown_function_falls_back_to_a_label():
 def test_short_and_malformed_frames_are_rejected():
     assert s7.parse(b"\x03\x00\x00") is None
     assert s7.parse(s7_frame(0x01, b"")) is not None
+
+
+def test_pdu_reference_is_read_from_the_header():
+    # TPKT, COTP data, S7 job with PDU reference 0x1234 and a read variable parameter.
+    message = s7.parse(bytes.fromhex("0300001302f080320100001234000200000401"))
+
+    assert message is not None
+    assert message.reference == 0x1234

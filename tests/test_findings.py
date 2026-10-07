@@ -141,3 +141,58 @@ def test_non_industrial_host_outside_targets_is_not_an_undeclared_asset():
 
     assert "OT-005" not in identifiers(findings)
     assert "OT-008" in identifiers(findings)
+
+
+def test_modbus_control_recommendation_names_the_modbus_port():
+    conversations = [make_conversation("10.42.7.11", "10.42.7.21", controls=1)]
+    findings = evaluate(empty_capture(), [], conversations)
+    control = next(item for item in findings if item.identifier == "OT-004")
+
+    assert "502" in control.recommendation
+    assert "102" not in control.recommendation
+
+
+def test_overlapping_writers_name_the_shared_registers():
+    conversations = [
+        make_conversation(
+            "10.42.7.10", "10.42.7.20", writes=1, written={"unit 1 holding registers": [(100, 104)]}
+        ),
+        make_conversation(
+            "10.42.9.80", "10.42.7.20", writes=1, written={"unit 1 holding registers": [(103, 110)]}
+        ),
+    ]
+    findings = evaluate(empty_capture(), [], conversations)
+    contested = next(item for item in findings if item.identifier == "OT-003")
+
+    assert "10.42.7.10 and 10.42.9.80 both write unit 1 holding registers 103-104" in (
+        contested.evidence
+    )
+
+
+def test_writers_on_separate_registers_are_told_apart():
+    conversations = [
+        make_conversation(
+            "10.42.7.10", "10.42.7.20", writes=1, written={"unit 1 holding registers": [(100, 104)]}
+        ),
+        make_conversation(
+            "10.42.9.80", "10.42.7.20", writes=1, written={"unit 1 holding registers": [(200, 200)]}
+        ),
+    ]
+    findings = evaluate(empty_capture(), [], conversations)
+    contested = next(item for item in findings if item.identifier == "OT-003")
+
+    assert "10.42.7.20: no register is written by more than one host" in contested.evidence
+
+
+def test_write_evidence_lists_the_written_ranges():
+    conversations = [
+        make_conversation(
+            "10.42.7.10", "10.42.7.20", writes=2, written={"unit 1 coils": [(16, 17)]}
+        ),
+    ]
+    findings = evaluate(empty_capture(), [], conversations)
+    writing = next(item for item in findings if item.identifier == "OT-002")
+
+    assert writing.evidence == [
+        "10.42.7.10 -> 10.42.7.20:502 - 2 write requests (unit 1 coils 16-17)"
+    ]

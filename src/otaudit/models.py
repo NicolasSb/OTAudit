@@ -98,6 +98,16 @@ class Conversation(BaseModel):
     last_seen: datetime
     mean_interval_ms: float | None = None
     jitter_ms: float | None = None
+    unanswered: int = 0
+    """Requests with no response; one still in flight when the capture ends counts too."""
+    response_ms_mean: float | None = None
+    response_ms_max: float | None = None
+    written: dict[str, list[tuple[int, int]]] = Field(default_factory=dict)
+    """Inclusive address ranges written, keyed by unit and table ("unit 1 coils")."""
+
+    @property
+    def written_ranges(self) -> list[str]:
+        return [f"{target} {format_ranges(ranges)}" for target, ranges in self.written.items()]
 
     @property
     def exception_count(self) -> int:
@@ -106,6 +116,10 @@ class Conversation(BaseModel):
     @property
     def exception_ratio(self) -> float:
         return self.exception_count / self.responses if self.responses else 0.0
+
+
+def format_ranges(ranges: list[tuple[int, int]]) -> str:
+    return ", ".join(str(first) if first == last else f"{first}-{last}" for first, last in ranges)
 
 
 class Finding(BaseModel):

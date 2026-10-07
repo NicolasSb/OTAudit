@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import net
 from .models import Capture, Conversation, Device, Protocol, Scope
-from .pcapfile import PcapReader
+from .pcapng import open_capture
 from .protocols import modbus, s7
 from .streams import DirectionalStream
 
@@ -53,8 +53,29 @@ class _Flow:
     functions: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     exceptions: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     request_times: list[float] = field(default_factory=list)
+    written: dict[tuple[int, str], set[tuple[int, int]]] = field(
+        default_factory=lambda: defaultdict(set)
+    )
+    pending: dict[int, tuple[float, str]] = field(default_factory=dict)
+    """Requests awaiting an answer, by transaction id or PDU reference."""
+    superseded: int = 0
+    response_times: list[float] = field(default_factory=list)
     first_seen: float = 0.0
     last_seen: float = 0.0
+
+    def ask(self, key: int, timestamp: float, function_name: str) -> None:
+        # A reused key before any answer means the earlier request went unanswered.
+        if key in self.pending:
+            self.superseded += 1
+        self.pending[key] = (timestamp, function_name)
+
+    def answer(self, key: int, timestamp: float) -> str | None:
+        """Close the matching request; return its function name if there was one."""
+        request = self.pending.pop(key, None)
+        if request is None:
+            return None
+        self.response_times.append((timestamp - request[0]) * 1000)
+        return request[1]
 
 
 @dataclass
@@ -130,7 +151,7 @@ class Analyser:
         is_request: bool,
         timestamp: float,
     ) -> None:
-        pdu = modbus.parse(frame)
+        pdu = modbus.parse(frame, request=is_request)
         if pdu is None:
             return
         flow.unit_ids.add(pdu.unit_id)
@@ -139,12 +160,19 @@ class Analyser:
             flow.requests += 1
             flow.request_times.append(timestamp)
             flow.functions[pdu.function_name] += 1
+            flow.ask(pdu.transaction, timestamp, pdu.function_name)
             if pdu.is_write:
                 flow.writes += 1
+            if pdu.is_control:
+                flow.controls += 1
+            if pdu.written and pdu.written[2] > 0:
+                table, first, count = pdu.written
+                flow.written[(pdu.unit_id, table)].add((first, first + count - 1))
             return
         flow.responses += 1
+        asked = flow.answer(pdu.transaction, timestamp)
         if pdu.is_exception and pdu.exception_name:
-            flow.exceptions[pdu.exception_name] += 1
+            flow.exceptions[_exception_key(pdu.exception_name, asked)] += 1
         if pdu.identification:
             self._devices[server].identification.update(pdu.identification)
 
@@ -163,14 +191,17 @@ class Analyser:
             flow.requests += 1
             flow.request_times.append(timestamp)
             flow.functions[message.function_name] += 1
+            flow.ask(message.reference, timestamp, message.function_name)
             if message.is_write:
                 flow.writes += 1
             if message.is_control:
                 flow.controls += 1
             return
         flow.responses += 1
+        asked = flow.answer(message.reference, timestamp)
         if message.failed:
-            flow.exceptions[f"error {message.error_class:#04x}{message.error_code:02x}"] += 1
+            error = f"error {message.error_class:#04x}{message.error_code:02x}"
+            flow.exceptions[_exception_key(error, asked)] += 1
         if message.identification:
             self._devices[server].identification.update(message.identification)
 
@@ -237,6 +268,7 @@ class Analyser:
         conversations = []
         for (client, server, port, protocol), flow in self._flows.items():
             mean, jitter = _interval_statistics(flow.request_times)
+            response_mean, response_max = _response_statistics(flow.response_times)
             conversations.append(
                 Conversation(
                     client=client,
@@ -254,6 +286,13 @@ class Analyser:
                     last_seen=_moment(flow.last_seen),
                     mean_interval_ms=mean,
                     jitter_ms=jitter,
+                    unanswered=flow.superseded + len(flow.pending),
+                    response_ms_mean=response_mean,
+                    response_ms_max=response_max,
+                    written={
+                        f"unit {unit} {table}": merge_ranges(ranges)
+                        for (unit, table), ranges in sorted(flow.written.items())
+                    },
                 )
             )
         return sorted(conversations, key=lambda item: (item.server, item.client, item.port))
@@ -278,14 +317,35 @@ class Analyser:
 
 def analyse(path: Path, scope: Scope) -> tuple[Capture, list[Device], list[Conversation]]:
     analyser = Analyser(scope)
-    with PcapReader(path) as reader:
+    with open_capture(path) as reader:
         for record in reader:
             if record.truncated:
                 analyser.truncated += 1
-            segment = net.decode(record, reader.linktype)
+            segment = net.decode(record, record.linktype)
             if segment is not None:
                 analyser.feed(segment)
     return analyser.capture(path), analyser.devices(), analyser.conversations()
+
+
+def merge_ranges(ranges: set[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Merge inclusive ranges that overlap or touch."""
+    merged: list[tuple[int, int]] = []
+    for first, last in sorted(ranges):
+        if merged and first <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], last))
+        else:
+            merged.append((first, last))
+    return merged
+
+
+def _exception_key(exception: str, function_name: str | None) -> str:
+    return f"{exception} on {function_name}" if function_name else exception
+
+
+def _response_statistics(times: list[float]) -> tuple[float | None, float | None]:
+    if not times:
+        return None, None
+    return round(statistics.fmean(times), 3), round(max(times), 3)
 
 
 def _interval_statistics(times: list[float]) -> tuple[float | None, float | None]:

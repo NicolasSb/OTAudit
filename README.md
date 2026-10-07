@@ -1,5 +1,7 @@
 # otaudit
 
+[![CI](https://github.com/NicolasSb/OTAudit/actions/workflows/ci.yml/badge.svg)](https://github.com/NicolasSb/OTAudit/actions/workflows/ci.yml)
+
 Reads a capture of industrial traffic and produces an asset inventory and an
 audit report, with findings mapped to IEC 62443-4-2 component requirements and
 to the ANSSI classification measures.

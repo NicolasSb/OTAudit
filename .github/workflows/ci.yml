@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: ruff check
+        run: ruff check --output-format=github src tests scripts
+      - name: ruff format
+        run: ruff format --check src tests scripts
+      - name: mypy (strict)
+        run: mypy src
+
+  test:
+    name: Tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - name: pytest
+        run: pytest --cov=otaudit --cov-report=term-missing --cov-fail-under=90
+      - name: Coverage summary
+        if: matrix.python == '3.12'
+        run: |
+          echo "## Coverage" >> "$GITHUB_STEP_SUMMARY"
+          coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+  sample:
+    name: Sample capture end to end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      # A plain install, as on an engagement laptop: checks the template ships in the wheel.
+      - run: pip install .
+      - name: Build the sample capture
+        run: python scripts/make_sample.py
+      - name: Analyse it
+        run: |
+          mkdir -p out
+          otaudit check-scope samples/scope.yaml
+          otaudit analyse samples/demo.pcap --scope samples/scope.yaml \
+            --report out/report.md --json out/inventory.json --ebios out/ebios.json \
+            2> out/summary.txt
+          cat out/summary.txt
+      - name: Job summary
+        run: |
+          {
+            echo "## Sample analysis"
+            echo
+            cat out/summary.txt
+            echo
+            grep '^### OT-' out/report.md | sed 's/^### /- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sample-report
+          path: out/

@@ -204,3 +204,11 @@ def test_analysis_reads_pcapng_like_pcap(sample_capture, sample_scope, tmp_path)
 
     assert pcapng_devices == pcap_devices
     assert pcapng_conversations == pcap_conversations
+
+
+def test_file_that_is_neither_format_is_rejected_plainly(tmp_path):
+    path = tmp_path / "notes.txt"
+    path.write_bytes(b"not a capture at all, just text")
+
+    with pytest.raises(PcapError, match="not a pcap or pcapng capture"):
+        open_capture(path)

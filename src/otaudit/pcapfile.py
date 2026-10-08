@@ -75,8 +75,7 @@ class PcapReader:
             endian, divisor = ">", 1_000_000_000
         else:
             raise PcapError(
-                f"{self.path}: unknown magic {raw_magic:#010x}; "
-                "pcapng files are read through open_capture"
+                f"{self.path}: unknown magic {raw_magic:#010x}; not a pcap or pcapng capture"
             )
         linktype = struct.unpack(endian + "I", header[20:24])[0]
         return endian, linktype, divisor

@@ -32,6 +32,10 @@ from .models import (
 EXCEPTION_RATIO_THRESHOLD = 0.05
 EXCEPTION_MINIMUM_RESPONSES = 20
 JITTER_RATIO_THRESHOLD = 1.0
+JITTER_MINIMUM_REQUESTS = 100
+SILENT_MINIMUM_REQUESTS = 10
+# Clients address a native Modbus/TCP device with 0 or 255; only 1-247 name serial slaves.
+SERIAL_UNIT_IDS = range(1, 248)
 HIGH_RISK_SERVICES = {21, 23, 69, 5900}
 
 Rule = Callable[[Capture, list[Device], list[Conversation]], list[Finding]]
@@ -360,7 +364,8 @@ def _polling_stability(
     unstable = [
         item
         for item in conversations
-        if item.mean_interval_ms
+        if item.requests >= JITTER_MINIMUM_REQUESTS
+        and item.mean_interval_ms
         and item.jitter_ms
         and item.jitter_ms / item.mean_interval_ms >= JITTER_RATIO_THRESHOLD
     ]
@@ -415,6 +420,75 @@ def _capture_window(
     ]
 
 
+def _modbus_gateways(
+    capture: Capture, devices: list[Device], conversations: list[Conversation]
+) -> list[Finding]:
+    gateways = [
+        device
+        for device in devices
+        if len([unit for unit in device.unit_ids if unit in SERIAL_UNIT_IDS]) > 1
+    ]
+    if not gateways:
+        return []
+    return [
+        Finding(
+            identifier="OT-012",
+            title="Modbus gateway fronting a serial bus outside the capture",
+            severity=Severity.MEDIUM,
+            assets=[str(device.address) for device in gateways],
+            evidence=[
+                f"{device.address} is addressed with unit IDs "
+                + ", ".join(str(unit) for unit in device.unit_ids)
+                for device in gateways
+            ],
+            iec_62443=["CR 1.2"],
+            anssi=["Mesure 1 (cartographie)"],
+            recommendation=(
+                "Each unit ID is a device on a serial bus the capture cannot see: inventory them "
+                "from the gateway configuration. Any host that reaches the gateway on port 502 "
+                "can read and write every one of them, so filter its sources as for a PLC."
+            ),
+        )
+    ]
+
+
+def _silent_exchanges(
+    capture: Capture, devices: list[Device], conversations: list[Conversation]
+) -> list[Finding]:
+    silent = [
+        item
+        for item in conversations
+        if item.requests >= SILENT_MINIMUM_REQUESTS and item.responses == 0
+    ]
+    if not silent:
+        return []
+    evidence = []
+    if not any(item.responses for item in conversations):
+        evidence.append(
+            "no exchange in the capture carries a response: the mirror is probably one-way"
+        )
+    evidence.extend(
+        f"{item.client} -> {item.server}:{item.port} - {item.requests} requests, no response"
+        for item in silent
+    )
+    return [
+        Finding(
+            identifier="OT-013",
+            title="Requests observed without any response",
+            severity=Severity.INFO,
+            assets=sorted({str(item.server) for item in silent}),
+            evidence=evidence,
+            iec_62443=[],
+            anssi=[],
+            recommendation=(
+                "Either the mirror carries one direction only, or the device does not answer. "
+                "Check the SPAN configuration before writing anything about these devices: a "
+                "one-way capture hides every response, identification and exception."
+            ),
+        )
+    ]
+
+
 RULES: tuple[Rule, ...] = (
     _cleartext_control,
     _write_operations,
@@ -426,4 +500,6 @@ RULES: tuple[Rule, ...] = (
     _identification_disclosure,
     _polling_stability,
     _capture_window,
+    _modbus_gateways,
+    _silent_exchanges,
 )

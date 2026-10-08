@@ -110,7 +110,7 @@ def test_high_risk_service_raises_the_severity():
 
 def test_unstable_polling_is_informational():
     conversations = [
-        make_conversation("10.0.0.1", "10.0.0.9", requests=50, mean_interval_ms=100, jitter_ms=250)
+        make_conversation("10.0.0.1", "10.0.0.9", requests=150, mean_interval_ms=100, jitter_ms=250)
     ]
     finding = next(
         item for item in evaluate(empty_capture(), [], conversations) if item.identifier == "OT-010"
@@ -196,3 +196,67 @@ def test_write_evidence_lists_the_written_ranges():
     assert writing.evidence == [
         "10.42.7.10 -> 10.42.7.20:502 - 2 write requests (unit 1 coils 16-17)"
     ]
+
+
+def test_jitter_over_too_few_requests_is_not_reported():
+    conversations = [
+        make_conversation("10.0.0.1", "10.0.0.9", requests=50, mean_interval_ms=100, jitter_ms=250)
+    ]
+
+    assert "OT-010" not in identifiers(evaluate(empty_capture(), [], conversations))
+
+
+def test_several_unit_ids_behind_one_address_reveal_a_gateway():
+    devices = [
+        Device(address=IPv4Address("10.42.7.25"), roles=["server"], unit_ids=[1, 2, 7]),
+        Device(address=IPv4Address("10.42.7.20"), roles=["server"], unit_ids=[1]),
+    ]
+    findings = evaluate(empty_capture(), devices, [])
+    gateway = next(item for item in findings if item.identifier == "OT-012")
+
+    assert gateway.severity is Severity.MEDIUM
+    assert gateway.assets == ["10.42.7.25"]
+    assert gateway.evidence == ["10.42.7.25 is addressed with unit IDs 1, 2, 7"]
+
+
+def test_unit_ids_0_and_255_do_not_make_a_gateway():
+    # Both are what clients send to a native Modbus/TCP device; UMAS uses 0.
+    devices = [
+        Device(address=IPv4Address("10.42.7.21"), roles=["server"], unit_ids=[0, 1, 255]),
+    ]
+
+    assert "OT-012" not in identifiers(evaluate(empty_capture(), devices, []))
+
+
+def test_exchange_without_any_response_is_reported():
+    conversations = [
+        make_conversation("10.42.7.10", "10.42.7.20", requests=40, responses=0, unanswered=40),
+        make_conversation("10.42.7.10", "10.42.7.21", requests=40, responses=40),
+    ]
+    findings = evaluate(empty_capture(), [], conversations)
+    silent = next(item for item in findings if item.identifier == "OT-013")
+
+    assert silent.severity is Severity.INFO
+    assert silent.assets == ["10.42.7.20"]
+    assert silent.evidence == ["10.42.7.10 -> 10.42.7.20:502 - 40 requests, no response"]
+
+
+def test_one_way_capture_is_called_out():
+    conversations = [
+        make_conversation("10.42.7.10", "10.42.7.20", requests=40, responses=0, unanswered=40),
+        make_conversation("10.42.7.10", "10.42.7.21", requests=12, responses=0, unanswered=12),
+    ]
+    findings = evaluate(empty_capture(), [], conversations)
+    silent = next(item for item in findings if item.identifier == "OT-013")
+
+    assert silent.evidence[0] == (
+        "no exchange in the capture carries a response: the mirror is probably one-way"
+    )
+
+
+def test_a_few_unanswered_requests_are_not_reported():
+    conversations = [
+        make_conversation("10.42.7.10", "10.42.7.20", requests=5, responses=0, unanswered=5),
+    ]
+
+    assert "OT-013" not in identifiers(evaluate(empty_capture(), [], conversations))

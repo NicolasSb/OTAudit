@@ -79,6 +79,8 @@ one:
 | OT-009 | Devices disclose model and firmware | low |
 | OT-010 | Unstable polling intervals | info |
 | OT-011 | Capture outside the authorised window | medium |
+| OT-012 | Modbus gateway fronting a serial bus outside the capture | medium |
+| OT-013 | Requests observed without any response | info |
 
 Severities are defaults for a capture read in isolation. They are a starting
 point for the discussion with the integrator, not a verdict: whether a second

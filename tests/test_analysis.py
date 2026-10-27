@@ -369,3 +369,127 @@ def test_s7_responses_are_matched_by_pdu_reference(sample_scope):
     assert engineering.unanswered == 0
     assert engineering.response_ms_mean == 4.0
     assert engineering.exceptions == {"error 0x8104 on read variable": 1}
+
+
+def test_opcua_session_is_described(sample_capture, sample_scope):
+    _, devices, conversations = analyse(sample_capture, sample_scope)
+    supervision = conversation(conversations, "10.42.7.10", "10.42.7.40")
+
+    assert supervision.protocol is Protocol.OPCUA
+    assert supervision.port == 4840
+    assert supervision.functions["read"] == 5
+    assert supervision.security_policies == {"None": 1}
+    # Create and activate session, five reads and a write; hello, channel and discovery excluded.
+    assert supervision.unsecured_requests == 8
+    assert supervision.identity_tokens == {"username": 1}
+    assert supervision.cleartext_users == ["supervision"]
+    assert supervision.written_nodes == ["ns=2;s=Line3.Setpoint"]
+    assert supervision.writes == 1
+    assert supervision.unanswered == 0
+    server = device(devices, "10.42.7.40")
+    assert server.protocols == [Protocol.OPCUA]
+    assert server.identification["application_name"] == "Line 3 gateway"
+    assert {(item.mode, item.policy) for item in server.endpoints} == {
+        ("None", "None"),
+        ("Sign", "Basic128Rsa15"),
+        ("SignAndEncrypt", "Basic256Sha256"),
+    }
+
+
+def test_opcua_encrypted_channel_is_counted_not_decoded(sample_capture, sample_scope):
+    _, _, conversations = analyse(sample_capture, sample_scope)
+    engineering = conversation(conversations, "10.42.7.11", "10.42.7.40")
+
+    assert engineering.security_policies == {"Basic256Sha256": 1}
+    assert engineering.functions["encrypted message"] == 4
+    assert engineering.requests == engineering.responses == 6
+    assert engineering.unsecured_requests == 0
+    assert engineering.unanswered == 0
+
+
+def _opcua_capture(tmp_path, exchanges, port=4840):
+    from otaudit.synthesis import CaptureBuilder
+
+    builder = CaptureBuilder(start=1_700_000_000.0)
+    offset = 0.0
+    for request, response in exchanges:
+        if request:
+            builder.add(offset, "10.42.7.10", "10.42.7.40", 40300, port, request)
+        offset += 0.01
+        if response:
+            builder.add(offset, "10.42.7.40", "10.42.7.10", port, 40300, response)
+        offset += 0.5
+    return builder.write(tmp_path / "opcua.pcap")
+
+
+def test_opcua_server_on_a_vendor_port_is_found_by_its_hello(sample_scope, tmp_path):
+    from otaudit.synthesis import opcua_acknowledge, opcua_hello, opcua_open
+
+    path = _opcua_capture(
+        tmp_path,
+        [
+            (opcua_hello("opc.tcp://gw:48010"), opcua_acknowledge()),
+            (opcua_open("None", 1), opcua_open("None", 1, response=True)),
+        ],
+        port=48010,
+    )
+    _, devices, conversations = analyse(path, sample_scope)
+    found = conversation(conversations, "10.42.7.10", "10.42.7.40")
+
+    assert found.protocol is Protocol.OPCUA
+    assert found.port == 48010
+    assert found.requests == found.responses == 2
+    assert device(devices, "10.42.7.40").roles == ["server"]
+    assert device(devices, "10.42.7.40").other_ports == []
+
+
+def test_opcua_message_split_in_chunks_counts_once(sample_scope, tmp_path):
+    from otaudit.synthesis import opcua_message, ua_read_request, ua_response_header
+
+    body = ua_read_request([(2, f"Tag{index}") for index in range(40)])
+    first = opcua_message(631, body[:200], 9, chunk=b"C")
+    # A continuation chunk carries the same sequence header and no service id.
+    last = first[:24].replace(b"MSGC", b"MSGF") + body[200:]
+    last = last[:4] + len(last).to_bytes(4, "little") + last[8:]
+    path = _opcua_capture(
+        tmp_path, [(first, None), (last, opcua_message(634, ua_response_header(), 9))]
+    )
+    _, _, conversations = analyse(path, sample_scope)
+    reading = conversation(conversations, "10.42.7.10", "10.42.7.40")
+
+    assert reading.requests == 1
+    assert reading.functions == {"read": 1}
+    assert reading.responses == 1
+    assert reading.unanswered == 0
+
+
+def test_opcua_errors_are_exceptions_on_the_request(sample_scope, tmp_path):
+    from otaudit.synthesis import (
+        opcua_chunk,
+        opcua_hello,
+        opcua_message,
+        ua_activate_session,
+        ua_response_header,
+    )
+
+    rejected = opcua_message(397, ua_response_header(0x80210000), 4)
+    path = _opcua_capture(
+        tmp_path,
+        [
+            (
+                opcua_hello("opc.tcp://gw:4840"),
+                opcua_chunk(b"ERR", b"\x00\x00\x13\x80\xff\xff\xff\xff"),
+            ),
+            (opcua_message(467, ua_activate_session("username", "op", b"x"), 4), rejected),
+        ],
+    )
+    _, _, conversations = analyse(path, sample_scope)
+    failing = conversation(conversations, "10.42.7.10", "10.42.7.40")
+
+    assert failing.exceptions == {
+        "BadIdentityTokenRejected on activate session": 1,
+        "BadSecurityChecksFailed on hello": 1,
+    }
+    assert failing.cleartext_users == ["op"]
+    # Without the channel being opened in the capture, its policy is unknown.
+    assert failing.unsecured_requests == 0

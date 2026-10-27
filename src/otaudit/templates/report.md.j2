@@ -40,6 +40,21 @@ way are absent from the inventory below, so treat it as a lower bound.
 {% else %}
 No device was observed.
 {% endif %}
+{% set offering = report.devices | selectattr("endpoints") | list %}
+{% if offering %}
+
+### OPC UA endpoints
+
+As the servers described them in answer to GetEndpoints.
+
+| Server | Endpoint | Security mode | Security policy | User tokens |
+| --- | --- | --- | --- | --- |
+{% for device in offering %}
+{% for endpoint in device.endpoints %}
+| {{ device.address }} | `{{ endpoint.url }}` | {{ endpoint.mode }} | {{ endpoint.policy }} | {{ endpoint.tokens | join(", ") or "-" }} |
+{% endfor %}
+{% endfor %}
+{% endif %}
 
 ## Exchanges
 
@@ -55,6 +70,15 @@ No device was observed.
 - `{{ item.client }} -> {{ item.server }}:{{ item.port }}`: {% for name, count in item.functions.items() %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}{% if item.written_ranges %}
 
   - written: {{ item.written_ranges | join("; ") }}{% endif %}
+{% if item.written_nodes %}
+
+  - nodes written: {{ item.written_nodes | join(", ") }}{% endif %}
+{% if item.security_policies %}
+
+  - secure channels: {% for name, count in item.security_policies.items() %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}{% endif %}
+{% if item.identity_tokens %}
+
+  - session users: {% for name, count in item.identity_tokens.items() %}{{ name }} ({{ count }}){{ ", " if not loop.last }}{% endfor %}{% endif %}
 
 {% endif %}
 {% endfor %}

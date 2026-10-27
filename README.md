@@ -20,8 +20,11 @@ network, who talks to whom, and who is allowed to write.
   strings; matching them against CISA ICS advisories is your job.
 - No risk analysis. The EBIOS RM export is a scaffold with empty severity and
   likelihood fields, because a capture cannot tell you what the process does.
-- Modbus/TCP and S7comm only. Not DNP3, not EtherNet/IP, not OPC UA, not
-  Profinet. Serial Modbus is out of reach by construction.
+- Modbus/TCP, S7comm and OPC UA Binary over TCP only. Not DNP3, not
+  EtherNet/IP, not Profinet, not OPC UA over HTTPS or WebSockets. Serial Modbus
+  is out of reach by construction.
+- No decryption. An OPC UA channel opened with SignAndEncrypt is counted, and its
+  security policy named, but its messages stay opaque.
 
 ## Install
 
@@ -81,6 +84,10 @@ one:
 | OT-011 | Capture outside the authorised window | medium |
 | OT-012 | Modbus gateway fronting a serial bus outside the capture | medium |
 | OT-013 | Requests observed without any response | info |
+| OT-014 | OPC UA used without signing or encryption | medium |
+| OT-015 | Deprecated OPC UA security policies | low |
+| OT-016 | OPC UA sessions without user authentication | medium |
+| OT-017 | OPC UA passwords sent without encryption | high |
 
 Severities are defaults for a capture read in isolation. They are a starting
 point for the discussion with the integrator, not a verdict: whether a second
@@ -91,12 +98,20 @@ Rules live in `findings.py`, one function each, and the report template is a
 Jinja file inside the package. Both are meant to be edited: the wording belongs
 to whoever signs the report.
 
+OPC UA is recognised on port 4840 and, on any other port, by the hello that
+opens each connection; a server on a vendor port whose connections all started
+before the capture goes unseen. OT-001 does not cover OPC UA, since the protocol
+can sign and encrypt: when it is not configured to, OT-014 says so. The OPC UA
+password behind OT-017 is never stored or printed, but it is in the capture
+file, which should be handled accordingly.
+
 ## Design notes
 
 The capture is decoded in-house, from the pcap or pcapng header down to the
-Modbus PDU, rather than through scapy or dpkt. The reason is practical: before
-this runs on a client network, someone on the client side may want to read it,
-and a few hundred lines of struct unpacking can be read in an afternoon.
+Modbus PDU or the OPC UA service, rather than through scapy or dpkt. The reason
+is practical: before this runs on a client network, someone on the client side
+may want to read it, and a few hundred lines of struct unpacking can be read in
+an afternoon.
 
 TCP reassembly handles retransmissions and duplicates, and resynchronises on a
 gap rather than splicing bytes that never followed each other. A mirrored port

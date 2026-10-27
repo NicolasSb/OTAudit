@@ -28,6 +28,7 @@ from .models import (
     Severity,
     format_ranges,
 )
+from .protocols.opcua import DEPRECATED_POLICIES
 
 EXCEPTION_RATIO_THRESHOLD = 0.05
 EXCEPTION_MINIMUM_RESPONSES = 20
@@ -53,6 +54,9 @@ def evaluate(
 def _cleartext_control(
     capture: Capture, devices: list[Device], conversations: list[Conversation]
 ) -> list[Finding]:
+    # OPC UA can sign and encrypt; when it does not, OT-014 says so as a configuration
+    # finding rather than a property of the protocol.
+    conversations = [item for item in conversations if item.protocol is not Protocol.OPCUA]
     if not conversations:
         return []
     protocols = sorted({item.protocol.value for item in conversations})
@@ -87,8 +91,10 @@ def _write_operations(
     evidence = [
         f"{item.client} -> {item.server}:{item.port} - {item.writes} write requests"
         + (f" ({'; '.join(item.written_ranges)})" if item.written_ranges else "")
+        + (f" ({_some(item.written_nodes)})" if item.written_nodes else "")
         for item in writing
     ]
+    ports = " or ".join(str(port) for port in sorted({item.port for item in writing}))
     return [
         Finding(
             identifier="OT-002",
@@ -100,7 +106,7 @@ def _write_operations(
             anssi=["Mesure 12 (gestion des droits)"],
             recommendation=(
                 "Confirm with the operator that each writing host is a legitimate controller. "
-                "Any host able to reach port 502 or 102 can issue the same requests, so the "
+                f"Any host able to reach port {ports} can issue the same requests, so the "
                 "control list is whatever the firewall allows, not what the application intends."
             ),
         )
@@ -147,10 +153,12 @@ def _shared_registers(
     written: dict[IPv4Address, dict[str, set[tuple[int, int]]]] = {
         client: defaultdict(set) for client in clients
     }
+    nodes: dict[IPv4Address, set[str]] = {client: set() for client in clients}
     for item in conversations:
         if item.server == server and item.client in written:
             for target, ranges in item.written.items():
                 written[item.client][target].update(ranges)
+            nodes[item.client].update(item.written_nodes)
     lines = []
     for index, first in enumerate(clients):
         for second in clients[index + 1 :]:
@@ -160,9 +168,19 @@ def _shared_registers(
                     lines.append(
                         f"{first} and {second} both write {target} {format_ranges(shared)}"
                     )
-    if not lines and all(written[client] for client in clients):
-        lines.append(f"{server}: no register is written by more than one host")
+            common = nodes[first] & nodes[second]
+            if common:
+                lines.append(f"{first} and {second} both write {_some(sorted(common))}")
+    if not lines and all(written[client] or nodes[client] for client in clients):
+        noun = "node" if any(nodes.values()) else "register"
+        lines.append(f"{server}: no {noun} is written by more than one host")
     return lines
+
+
+def _some(items: list[str], shown: int = 5) -> str:
+    """List a few items and say how many more there are."""
+    listed = ", ".join(items[:shown])
+    return f"{listed} and {len(items) - shown} more" if len(items) > shown else listed
 
 
 def _intersection(left: set[tuple[int, int]], right: set[tuple[int, int]]) -> list[tuple[int, int]]:
@@ -489,6 +507,154 @@ def _silent_exchanges(
     ]
 
 
+def _opcua_without_security(
+    capture: Capture, devices: list[Device], conversations: list[Conversation]
+) -> list[Finding]:
+    unsecured = [item for item in conversations if item.unsecured_requests]
+    offering = [
+        (device, [endpoint for endpoint in device.endpoints if endpoint.mode == "None"])
+        for device in devices
+    ]
+    offering = [(device, endpoints) for device, endpoints in offering if endpoints]
+    if not unsecured and not offering:
+        return []
+    evidence = [
+        f"{item.client} -> {item.server}:{item.port} - {item.unsecured_requests} requests "
+        "on a secure channel with security policy None"
+        for item in unsecured
+    ]
+    evidence.extend(
+        f"{device.address} offers {endpoint.url} with security mode None"
+        for device, endpoints in offering
+        for endpoint in endpoints
+    )
+    assets = {item.server for item in unsecured} | {device.address for device, _ in offering}
+    return [
+        Finding(
+            identifier="OT-014",
+            title="OPC UA used without signing or encryption",
+            severity=Severity.MEDIUM,
+            assets=[str(address) for address in sorted(assets)],
+            evidence=evidence,
+            iec_62443=["CR 3.1", "CR 4.1"],
+            anssi=["Mesure 19 (protocoles)"],
+            recommendation=(
+                "OPC UA can sign and encrypt every message; these exchanges did neither, and are "
+                "as open to reading and tampering as Modbus. Move the clients to SignAndEncrypt "
+                "endpoints with Basic256Sha256 or a newer policy, then remove the None endpoint "
+                "from the server. Discovery over policy None (GetEndpoints, FindServers) is what "
+                "the specification expects and is not counted here."
+            ),
+        )
+    ]
+
+
+def _opcua_deprecated_policies(
+    capture: Capture, devices: list[Device], conversations: list[Conversation]
+) -> list[Finding]:
+    evidence = []
+    assets = set()
+    for item in conversations:
+        for policy, count in item.security_policies.items():
+            if policy in DEPRECATED_POLICIES:
+                evidence.append(
+                    f"{item.client} -> {item.server}:{item.port} - "
+                    f"{count} secure channels opened with {policy}"
+                )
+                assets.add(item.server)
+    for device in devices:
+        for endpoint in device.endpoints:
+            if endpoint.policy in DEPRECATED_POLICIES:
+                evidence.append(f"{device.address} offers {endpoint.url} with {endpoint.policy}")
+                assets.add(device.address)
+    if not evidence:
+        return []
+    return [
+        Finding(
+            identifier="OT-015",
+            title="Deprecated OPC UA security policies",
+            severity=Severity.LOW,
+            assets=[str(address) for address in sorted(assets)],
+            evidence=evidence,
+            iec_62443=["CR 4.3"],
+            anssi=["Mesure 19 (protocoles)"],
+            recommendation=(
+                "Basic128Rsa15 and Basic256 rely on SHA-1 and were deprecated by the OPC "
+                "Foundation. Disable them on the server once every client supports "
+                "Basic256Sha256 or one of the Aes policies."
+            ),
+        )
+    ]
+
+
+def _opcua_anonymous_sessions(
+    capture: Capture, devices: list[Device], conversations: list[Conversation]
+) -> list[Finding]:
+    evidence = []
+    assets = set()
+    for item in conversations:
+        count = item.identity_tokens.get("anonymous", 0)
+        if count:
+            evidence.append(
+                f"{item.client} -> {item.server}:{item.port} - "
+                f"{count} sessions activated anonymously"
+            )
+            assets.add(item.server)
+    for device in devices:
+        urls = sorted({e.url for e in device.endpoints if "anonymous" in e.tokens})
+        if urls:
+            evidence.append(f"{device.address} accepts anonymous users on {', '.join(urls)}")
+            assets.add(device.address)
+    if not evidence:
+        return []
+    return [
+        Finding(
+            identifier="OT-016",
+            title="OPC UA sessions without user authentication",
+            severity=Severity.MEDIUM,
+            assets=[str(address) for address in sorted(assets)],
+            evidence=evidence,
+            iec_62443=["CR 1.1", "CR 2.1"],
+            anssi=["Mesure 12 (gestion des droits)"],
+            recommendation=(
+                "An anonymous session gets whatever the server grants to everyone, which on many "
+                "servers includes writing. Disable the anonymous token, or restrict the anonymous "
+                "role to reading, and give each client its own user or certificate."
+            ),
+        )
+    ]
+
+
+def _opcua_cleartext_passwords(
+    capture: Capture, devices: list[Device], conversations: list[Conversation]
+) -> list[Finding]:
+    exposed = [item for item in conversations if item.cleartext_users]
+    if not exposed:
+        return []
+    return [
+        Finding(
+            identifier="OT-017",
+            title="OPC UA passwords sent without encryption",
+            severity=Severity.HIGH,
+            assets=[str(address) for address in sorted({item.server for item in exposed})],
+            evidence=[
+                f"{item.client} -> {item.server}:{item.port} - password of "
+                + ", ".join(f"'{user}'" for user in item.cleartext_users)
+                + " readable in the capture"
+                for item in exposed
+            ],
+            iec_62443=["CR 1.5", "CR 4.1"],
+            anssi=["Mesure 12 (gestion des droits)", "Mesure 19 (protocoles)"],
+            recommendation=(
+                "The password is in the capture file itself: change it, and handle the capture as "
+                "a credential until it is deleted. Then make sure passwords leave the client "
+                "encrypted, either on a SignAndEncrypt channel or through a user token policy "
+                "with its own security policy."
+            ),
+        )
+    ]
+
+
 RULES: tuple[Rule, ...] = (
     _cleartext_control,
     _write_operations,
@@ -502,4 +668,8 @@ RULES: tuple[Rule, ...] = (
     _capture_window,
     _modbus_gateways,
     _silent_exchanges,
+    _opcua_without_security,
+    _opcua_deprecated_policies,
+    _opcua_anonymous_sessions,
+    _opcua_cleartext_passwords,
 )

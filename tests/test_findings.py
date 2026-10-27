@@ -260,3 +260,109 @@ def test_a_few_unanswered_requests_are_not_reported():
     ]
 
     assert "OT-013" not in identifiers(evaluate(empty_capture(), [], conversations))
+
+
+def opcua_conversation(client, server, **overrides):
+    return make_conversation(client, server, port=4840, protocol=Protocol.OPCUA, **overrides)
+
+
+def opcua_server(address, *endpoints):
+    from otaudit.models import Endpoint
+
+    return Device(
+        address=IPv4Address(address),
+        roles=["server"],
+        protocols=[Protocol.OPCUA],
+        endpoints=[
+            Endpoint(url=f"opc.tcp://{address}:4840", mode=mode, policy=policy, tokens=tokens)
+            for mode, policy, tokens in endpoints
+        ],
+    )
+
+
+def finding(findings, identifier):
+    return next(item for item in findings if item.identifier == identifier)
+
+
+def test_sample_capture_raises_the_opcua_findings(sample_capture, sample_scope):
+    capture, devices, conversations = analyse(sample_capture, sample_scope)
+    findings = evaluate(capture, devices, conversations)
+
+    assert {"OT-014", "OT-015", "OT-016", "OT-017"} <= set(identifiers(findings))
+    assert "10.42.7.40" not in finding(findings, "OT-001").assets
+
+
+def test_secured_opcua_raises_nothing():
+    conversations = [
+        opcua_conversation("10.0.0.1", "10.0.0.9", security_policies={"Aes256_Sha256_RsaPss": 2})
+    ]
+    devices = [opcua_server("10.0.0.9", ("SignAndEncrypt", "Basic256Sha256", ["certificate"]))]
+
+    assert evaluate(empty_capture(), devices, conversations) == []
+
+
+def test_opcua_without_security_names_sessions_and_offers():
+    conversations = [opcua_conversation("10.0.0.1", "10.0.0.9", unsecured_requests=12)]
+    devices = [
+        opcua_server("10.0.0.9"),
+        opcua_server("10.0.0.10", ("None", "None", ["username"])),
+    ]
+    result = finding(evaluate(empty_capture(), devices, conversations), "OT-014")
+
+    assert result.severity is Severity.MEDIUM
+    assert result.assets == ["10.0.0.9", "10.0.0.10"]
+    assert "12 requests" in result.evidence[0]
+    assert "10.0.0.10 offers" in result.evidence[1]
+
+
+def test_deprecated_opcua_policies_used_or_offered_are_low():
+    conversations = [opcua_conversation("10.0.0.1", "10.0.0.9", security_policies={"Basic256": 3})]
+    devices = [opcua_server("10.0.0.10", ("Sign", "Basic128Rsa15", ["username"]))]
+    result = finding(evaluate(empty_capture(), devices, conversations), "OT-015")
+
+    assert result.severity is Severity.LOW
+    assert result.assets == ["10.0.0.9", "10.0.0.10"]
+    assert "3 secure channels opened with Basic256" in result.evidence[0]
+
+
+def test_anonymous_opcua_sessions_are_reported():
+    conversations = [opcua_conversation("10.0.0.1", "10.0.0.9", identity_tokens={"anonymous": 4})]
+    devices = [opcua_server("10.0.0.10", ("SignAndEncrypt", "Basic256Sha256", ["anonymous"]))]
+    result = finding(evaluate(empty_capture(), devices, conversations), "OT-016")
+
+    assert result.severity is Severity.MEDIUM
+    assert result.assets == ["10.0.0.9", "10.0.0.10"]
+    assert "4 sessions activated anonymously" in result.evidence[0]
+
+
+def test_cleartext_opcua_password_is_high():
+    conversations = [opcua_conversation("10.0.0.1", "10.0.0.9", cleartext_users=["operator"])]
+    result = finding(evaluate(empty_capture(), [], conversations), "OT-017")
+
+    assert result.severity is Severity.HIGH
+    assert result.evidence == [
+        "10.0.0.1 -> 10.0.0.9:4840 - password of 'operator' readable in the capture"
+    ]
+
+
+def test_two_opcua_writers_on_the_same_node_are_named():
+    nodes = [f"ns=2;s=Tag{index}" for index in range(8)]
+    conversations = [
+        opcua_conversation("10.0.0.1", "10.0.0.9", writes=1, written_nodes=nodes),
+        opcua_conversation("10.0.0.2", "10.0.0.9", writes=1, written_nodes=["ns=2;s=Tag3"]),
+    ]
+    findings = evaluate(empty_capture(), [], conversations)
+
+    assert finding(findings, "OT-003").evidence[1] == "10.0.0.1 and 10.0.0.2 both write ns=2;s=Tag3"
+    assert "and 3 more" in finding(findings, "OT-002").evidence[0]
+    assert "port 4840 can" in finding(findings, "OT-002").recommendation
+
+
+def test_opcua_writers_on_distinct_nodes_are_said_to_be_apart():
+    conversations = [
+        opcua_conversation("10.0.0.1", "10.0.0.9", writes=1, written_nodes=["ns=2;s=A"]),
+        opcua_conversation("10.0.0.2", "10.0.0.9", writes=1, written_nodes=["ns=2;s=B"]),
+    ]
+    contested = finding(evaluate(empty_capture(), [], conversations), "OT-003")
+
+    assert contested.evidence[1] == "10.0.0.9: no node is written by more than one host"

@@ -25,7 +25,7 @@ EXIT_FINDINGS = 3
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="otaudit",
-        description="Passive audit of Modbus/TCP and S7comm traffic captures.",
+        description="Passive audit of Modbus/TCP, S7comm and OPC UA traffic captures.",
     )
     parser.add_argument("--version", action="version", version=f"otaudit {__version__}")
     subparsers = parser.add_subparsers(dest="command", required=True)

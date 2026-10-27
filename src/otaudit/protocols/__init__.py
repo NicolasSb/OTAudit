@@ -1,5 +1,5 @@
 """Protocol decoders."""
 
-from . import modbus, s7
+from . import modbus, opcua, s7
 
-__all__ = ["modbus", "s7"]
+__all__ = ["modbus", "opcua", "s7"]

@@ -35,6 +35,17 @@ def test_rendered_report_contains_the_engagement_and_findings(sample_capture, sa
     assert "6ES7 214-1AG40-0XB0" in text
 
 
+def test_rendered_report_describes_opcua(sample_capture, sample_scope):
+    text = render(build_report(sample_capture, sample_scope))
+
+    assert "### OPC UA endpoints" in text
+    assert "| 10.42.7.40 | `opc.tcp://10.42.7.40:4840` | Sign | Basic128Rsa15 | username |" in text
+    assert "  - nodes written: ns=2;s=Line3.Setpoint" in text
+    assert "  - secure channels: None (1)" in text
+    assert "  - session users: username (1)" in text
+    assert "Line3-2019" not in text
+
+
 def test_rendered_report_states_its_limits(sample_capture, sample_scope):
     text = render(build_report(sample_capture, sample_scope))
 

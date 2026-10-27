@@ -2,7 +2,7 @@
 
 Real captures from a production site cannot be published, and a tool with no
 sample is a tool nobody tries. Everything here builds well-formed Ethernet/IPv4/TCP
-frames carrying handmade Modbus and S7 payloads, with correct checksums, so the
+frames carrying handmade Modbus, S7 and OPC UA payloads, with correct checksums, so the
 result opens in Wireshark like any other capture.
 """
 
@@ -14,7 +14,7 @@ from ipaddress import IPv4Address
 from pathlib import Path
 
 from .pcapfile import LINKTYPE_ETHERNET, Record, write_pcap
-from .protocols import modbus, s7
+from .protocols import modbus, opcua, s7
 
 
 def checksum(data: bytes) -> int:
@@ -111,6 +111,169 @@ def szl_module_record(article: str) -> bytes:
 
 def szl_component_record(index: int, value: str) -> bytes:
     return struct.pack("!H", index) + value.encode("latin-1").ljust(32, b"\x00")
+
+
+POLICY_PREFIX = "http://opcfoundation.org/UA/SecurityPolicy#"
+SECURITY_MODE_IDS = {name: value for value, name in opcua.SECURITY_MODES.items()}
+TOKEN_TYPE_IDS = {name: value for value, name in opcua.TOKEN_TYPES.items()}
+TOKEN_ENCODING_IDS = {"anonymous": 321, "username": 324, "certificate": 327}
+
+
+def ua_string(value: str | bytes | None) -> bytes:
+    if value is None:
+        return struct.pack("<i", -1)
+    raw = value.encode("utf-8") if isinstance(value, str) else value
+    return struct.pack("<i", len(raw)) + raw
+
+
+def ua_numeric_node(identifier: int, namespace: int = 0) -> bytes:
+    return struct.pack("<BBH", 0x01, namespace, identifier)
+
+
+def ua_string_node(name: str, namespace: int) -> bytes:
+    return struct.pack("<BH", 0x03, namespace) + ua_string(name)
+
+
+def ua_request_header(handle: int = 1) -> bytes:
+    # Null authentication token, no audit entry, no additional header.
+    return b"\x00\x00" + struct.pack("<QIIiIBBB", 0, handle, 0, -1, 10000, 0, 0, 0)
+
+
+def ua_response_header(status: int = 0, handle: int = 1) -> bytes:
+    return struct.pack("<QIIBiBBB", 0, handle, status, 0, -1, 0, 0, 0)
+
+
+def opcua_chunk(kind: bytes, body: bytes, chunk: bytes = b"F") -> bytes:
+    return kind + chunk + struct.pack("<I", opcua.HEADER + len(body)) + body
+
+
+def opcua_hello(url: str) -> bytes:
+    return opcua_chunk(b"HEL", struct.pack("<IIIII", 0, 65536, 65536, 0, 0) + ua_string(url))
+
+
+def opcua_acknowledge() -> bytes:
+    return opcua_chunk(b"ACK", struct.pack("<IIIII", 0, 65536, 65536, 0, 0))
+
+
+def opcua_open(policy: str, request_id: int, response: bool = False) -> bytes:
+    """An OpenSecureChannel chunk; under any policy but None its body is opaque bytes."""
+    channel = 7 if response else 0
+    header = struct.pack("<I", channel) + ua_string(POLICY_PREFIX + policy)
+    if policy != "None":
+        certificate = b"\x30\x82" + bytes(range(64))
+        return opcua_chunk(
+            b"OPN", header + ua_string(certificate) + ua_string(bytes(20)) + bytes(128)
+        )
+    header += ua_string(None) + ua_string(None) + struct.pack("<II", request_id, request_id)
+    if response:
+        body = ua_numeric_node(449) + ua_response_header()
+        body += struct.pack("<IIIQI", 0, channel, 1, 0, 3600000) + ua_string(None)
+    else:
+        body = ua_numeric_node(446) + ua_request_header()
+        body += struct.pack("<III", 0, 0, 1) + ua_string(None) + struct.pack("<I", 3600000)
+    return opcua_chunk(b"OPN", header + body)
+
+
+def opcua_message(service: int, body: bytes, request_id: int, chunk: bytes = b"F") -> bytes:
+    header = struct.pack("<IIII", 7, 1, request_id, request_id)
+    return opcua_chunk(b"MSG", header + ua_numeric_node(service) + body, chunk)
+
+
+def opcua_encrypted(request_id: int, size: int = 96) -> bytes:
+    """A chunk of a SignAndEncrypt channel: only the channel and token ids are readable."""
+    noise = bytes((request_id * 37 + index * 11) & 0xFF for index in range(size))
+    return opcua_chunk(b"MSG", struct.pack("<II", 7, 1) + noise)
+
+
+def ua_application(name: str, uri: str, product: str, kind: int = 0) -> bytes:
+    """An ApplicationDescription; kind 0 is a server, 1 a client."""
+    encoded = ua_string(uri) + ua_string(product) + b"\x02" + ua_string(name)
+    return encoded + struct.pack("<I", kind) + ua_string(None) + ua_string(None) + b"\xff" * 4
+
+
+def ua_endpoint(
+    url: str,
+    mode: str,
+    policy: str,
+    tokens: list[str],
+    application: tuple[str, str, str] = ("", "", ""),
+) -> bytes:
+    """An EndpointDescription; application is (name, application uri, product uri)."""
+    encoded = ua_string(url) + ua_application(*application) + ua_string(None)
+    encoded += struct.pack("<I", SECURITY_MODE_IDS[mode])
+    encoded += ua_string(POLICY_PREFIX + policy) + struct.pack("<i", len(tokens))
+    for token in tokens:
+        encoded += ua_string(token) + struct.pack("<I", TOKEN_TYPE_IDS[token])
+        encoded += ua_string(None) * 3
+    return encoded + ua_string(None) + b"\x00"
+
+
+def ua_get_endpoints_request(url: str) -> bytes:
+    return ua_request_header() + ua_string(url) + struct.pack("<ii", 0, 0)
+
+
+def ua_create_session_request(url: str, session: str) -> bytes:
+    client = ua_application("Supervision", "urn:scada:client", "urn:vendor:scada", kind=1)
+    body = ua_request_header() + client + ua_string(None) + ua_string(url) + ua_string(session)
+    return body + ua_string(bytes(32)) + ua_string(None) + struct.pack("<dI", 600000.0, 0)
+
+
+def ua_create_session_response() -> bytes:
+    body = (
+        ua_response_header()
+        + struct.pack("<BBH", 0x01, 1, 1001)
+        + struct.pack("<BBH", 0x01, 1, 1002)
+    )
+    body += struct.pack("<d", 600000.0) + ua_string(bytes(32)) + ua_string(None)
+    return (
+        body + struct.pack("<ii", 0, 0) + ua_string(None) + ua_string(None) + struct.pack("<I", 0)
+    )
+
+
+def ua_status_results(count: int, status: int = 0) -> bytes:
+    """The results and diagnostic arrays that end activate session and write responses."""
+    return struct.pack("<i", count) + struct.pack("<I", status) * count + struct.pack("<i", 0)
+
+
+def ua_read_response(values: list[float]) -> bytes:
+    body = ua_response_header() + struct.pack("<i", len(values))
+    for value in values:
+        body += b"\x01\x0b" + struct.pack("<d", value)
+    return body + struct.pack("<i", 0)
+
+
+def ua_get_endpoints_response(endpoints: list[bytes], status: int = 0) -> bytes:
+    return ua_response_header(status) + struct.pack("<i", len(endpoints)) + b"".join(endpoints)
+
+
+def ua_activate_session(
+    token: str, user: str = "", password: bytes = b"", algorithm: str | None = None
+) -> bytes:
+    body = ua_request_header() + ua_string(None) + ua_string(None)
+    body += struct.pack("<ii", 0, 0)
+    if token == "username":
+        content = ua_string("username") + ua_string(user) + ua_string(password)
+        content += ua_string(algorithm)
+    else:
+        content = ua_string("anonymous")
+    body += ua_numeric_node(TOKEN_ENCODING_IDS[token]) + b"\x01" + ua_string(content)
+    return body + ua_string(None) + ua_string(None)
+
+
+def ua_write_request(nodes: list[tuple[int, str]], value: float = 0.0) -> bytes:
+    body = ua_request_header() + struct.pack("<i", len(nodes))
+    for namespace, name in nodes:
+        body += ua_string_node(name, namespace) + struct.pack("<I", 13) + ua_string(None)
+        body += b"\x01" + b"\x0b" + struct.pack("<d", value)
+    return body
+
+
+def ua_read_request(nodes: list[tuple[int, str]]) -> bytes:
+    body = ua_request_header() + struct.pack("<dIi", 0.0, 0, len(nodes))
+    for namespace, name in nodes:
+        body += ua_string_node(name, namespace) + struct.pack("<I", 13) + ua_string(None)
+        body += struct.pack("<H", 0) + ua_string(None)
+    return body
 
 
 @dataclass
@@ -299,5 +462,82 @@ def build_sample_capture(path: Path) -> Path:
     builder.add(offset, maintenance, slaves[0], 51200, 23, b"\xff\xfb\x01")
     offset += 0.05
     builder.add(offset, slaves[0], maintenance, 23, 51200, b"\xff\xfd\x01login: ")
+    offset += 0.5
 
+    _add_opcua_sessions(builder, offset, scada, engineering, "10.42.7.40")
     return builder.write(path)
+
+
+def _add_opcua_sessions(
+    builder: CaptureBuilder, offset: float, scada: str, engineering: str, server: str
+) -> None:
+    """Supervision on a None channel with a clear password; engineering fully encrypted."""
+    url = f"opc.tcp://{server}:4840"
+    application = ("Line 3 gateway", "urn:line3:gateway", "urn:vendor:uagateway")
+    exchanges = [
+        (opcua_hello(url), opcua_acknowledge()),
+        (opcua_open("None", 1), opcua_open("None", 1, response=True)),
+        (
+            opcua_message(opcua.GET_ENDPOINTS, ua_get_endpoints_request(url), 2),
+            opcua_message(
+                opcua.GET_ENDPOINTS_RESPONSE,
+                ua_get_endpoints_response(
+                    [
+                        ua_endpoint(url, "None", "None", ["anonymous", "username"], application),
+                        ua_endpoint(url, "Sign", "Basic128Rsa15", ["username"], application),
+                        ua_endpoint(
+                            url, "SignAndEncrypt", "Basic256Sha256", ["username", "certificate"]
+                        ),
+                    ]
+                ),
+                2,
+            ),
+        ),
+        (
+            opcua_message(461, ua_create_session_request(url, "Supervision"), 3),
+            opcua_message(464, ua_create_session_response(), 3),
+        ),
+        (
+            opcua_message(
+                opcua.ACTIVATE_SESSION,
+                ua_activate_session("username", "supervision", b"Line3-2019"),
+                4,
+            ),
+            opcua_message(
+                470, ua_response_header() + ua_string(bytes(32)) + ua_status_results(0), 4
+            ),
+        ),
+    ]
+    polled = [(2, "Line3.Level"), (2, "Line3.Flow")]
+    request_id = 5
+    for cycle in range(5):
+        exchanges.append(
+            (
+                opcua_message(631, ua_read_request(polled), request_id),
+                opcua_message(634, ua_read_response([2.5 + cycle, 11.0]), request_id),
+            )
+        )
+        request_id += 1
+    written = ua_write_request([(2, "Line3.Setpoint")], 42.0)
+    exchanges.append(
+        (
+            opcua_message(opcua.WRITE, written, request_id),
+            opcua_message(676, ua_response_header() + ua_status_results(1), request_id),
+        )
+    )
+    for request, response in exchanges:
+        builder.add(offset, scada, server, 40300, 4840, request)
+        offset += 0.01
+        builder.add(offset, server, scada, 4840, 40300, response)
+        offset += 0.5
+
+    secured = [
+        (opcua_hello(url), opcua_acknowledge()),
+        (opcua_open("Basic256Sha256", 1), opcua_open("Basic256Sha256", 1, response=True)),
+    ]
+    secured.extend((opcua_encrypted(index), opcua_encrypted(index + 100)) for index in range(4))
+    for request, response in secured:
+        builder.add(offset, engineering, server, 52100, 4840, request)
+        offset += 0.01
+        builder.add(offset, server, engineering, 4840, 52100, response)
+        offset += 0.5

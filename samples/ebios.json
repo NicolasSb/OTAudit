@@ -11,7 +11,8 @@
         "10.42.7.20"
       ],
       "constats": [
-        "10.42.7.20 written by 10.42.7.10, 10.42.9.80"
+        "10.42.7.20 written by 10.42.7.10, 10.42.9.80",
+        "10.42.7.10 and 10.42.9.80 both write unit 1 holding registers 100"
       ],
       "referentiels": {
         "iec_62443_4_2": [
@@ -43,6 +44,30 @@
         ],
         "anssi": [
           "Mesure 14 (durcissement)",
+          "Mesure 19 (protocoles)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-017",
+      "libelle": "OPC UA passwords sent without encryption",
+      "biens_supports": [
+        "10.42.7.40"
+      ],
+      "constats": [
+        "10.42.7.10 -> 10.42.7.40:4840 - password of 'supervision' readable in the capture"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 1.5",
+          "CR 4.1"
+        ],
+        "anssi": [
+          "Mesure 12 (gestion des droits)",
           "Mesure 19 (protocoles)"
         ]
       },
@@ -84,12 +109,14 @@
       "libelle": "Write operations observed on the control network",
       "biens_supports": [
         "10.42.7.20",
-        "10.42.7.30"
+        "10.42.7.30",
+        "10.42.7.40"
       ],
       "constats": [
-        "10.42.7.10 -> 10.42.7.20:502 - 1 write requests",
-        "10.42.9.80 -> 10.42.7.20:502 - 1 write requests",
-        "10.42.7.11 -> 10.42.7.30:102 - 1 write requests"
+        "10.42.7.10 -> 10.42.7.20:502 - 1 write requests (unit 1 holding registers 100)",
+        "10.42.9.80 -> 10.42.7.20:502 - 1 write requests (unit 1 holding registers 100)",
+        "10.42.7.11 -> 10.42.7.30:102 - 1 write requests",
+        "10.42.7.10 -> 10.42.7.40:4840 - 1 write requests (ns=2;s=Line3.Setpoint)"
       ],
       "referentiels": {
         "iec_62443_4_2": [
@@ -128,13 +155,60 @@
       "mesures_existantes": []
     },
     {
+      "identifiant": "OT-014",
+      "libelle": "OPC UA used without signing or encryption",
+      "biens_supports": [
+        "10.42.7.40"
+      ],
+      "constats": [
+        "10.42.7.10 -> 10.42.7.40:4840 - 8 requests on a secure channel with security policy None",
+        "10.42.7.40 offers opc.tcp://10.42.7.40:4840 with security mode None"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 3.1",
+          "CR 4.1"
+        ],
+        "anssi": [
+          "Mesure 19 (protocoles)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-016",
+      "libelle": "OPC UA sessions without user authentication",
+      "biens_supports": [
+        "10.42.7.40"
+      ],
+      "constats": [
+        "10.42.7.40 accepts anonymous users on opc.tcp://10.42.7.40:4840"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 1.1",
+          "CR 2.1"
+        ],
+        "anssi": [
+          "Mesure 12 (gestion des droits)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
       "identifiant": "OT-007",
       "libelle": "Recurrent protocol exceptions",
       "biens_supports": [
         "10.42.7.22"
       ],
       "constats": [
-        "10.42.7.10 -> 10.42.7.22:502 - 50% of responses are exceptions (illegal data address x20)"
+        "10.42.7.10 -> 10.42.7.22:502 - 50% of responses are exceptions (illegal data address on read holding registers x20)"
       ],
       "referentiels": {
         "iec_62443_4_2": [
@@ -154,11 +228,13 @@
       "libelle": "Devices disclose model and firmware to any peer",
       "biens_supports": [
         "10.42.7.21",
-        "10.42.7.30"
+        "10.42.7.30",
+        "10.42.7.40"
       ],
       "constats": [
         "10.42.7.21: product=TM241CE40R, revision=5.1.9.9, vendor=Schneider Electric",
-        "10.42.7.30: article_number=6ES7 214-1AG40-0XB0, module_type=CPU 1214C DC/DC/DC, plc_name=LINE2_CPU"
+        "10.42.7.30: article_number=6ES7 214-1AG40-0XB0, module_type=CPU 1214C DC/DC/DC, plc_name=LINE2_CPU",
+        "10.42.7.40: application_name=Line 3 gateway, application_uri=urn:line3:gateway, product_uri=urn:vendor:uagateway"
       ],
       "referentiels": {
         "iec_62443_4_2": [
@@ -167,6 +243,28 @@
         "anssi": [
           "Mesure 1 (cartographie)",
           "Mesure 20 (veille vulnérabilités)"
+        ]
+      },
+      "gravite": null,
+      "vraisemblance": null,
+      "evenement_redoute": null,
+      "mesures_existantes": []
+    },
+    {
+      "identifiant": "OT-015",
+      "libelle": "Deprecated OPC UA security policies",
+      "biens_supports": [
+        "10.42.7.40"
+      ],
+      "constats": [
+        "10.42.7.40 offers opc.tcp://10.42.7.40:4840 with Basic128Rsa15"
+      ],
+      "referentiels": {
+        "iec_62443_4_2": [
+          "CR 4.3"
+        ],
+        "anssi": [
+          "Mesure 19 (protocoles)"
         ]
       },
       "gravite": null,

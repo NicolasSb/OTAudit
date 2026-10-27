@@ -18,9 +18,9 @@
   "capture": {
     "path": "samples/demo.pcap",
     "started_at": "2023-11-14T22:13:20Z",
-    "ended_at": "2023-11-14T22:13:53.419000Z",
-    "packets": 255,
-    "industrial_frames": 253,
+    "ended_at": "2023-11-14T22:14:02.089000Z",
+    "packets": 289,
+    "industrial_frames": 287,
     "truncated_records": 0,
     "stream_gaps": 0,
     "within_window": true
@@ -36,7 +36,8 @@
       "identification": {},
       "in_scope": true,
       "excluded": false,
-      "other_ports": []
+      "other_ports": [],
+      "endpoints": []
     },
     {
       "address": "10.42.7.11",
@@ -48,7 +49,8 @@
       "identification": {},
       "in_scope": true,
       "excluded": false,
-      "other_ports": []
+      "other_ports": [],
+      "endpoints": []
     },
     {
       "address": "10.42.7.20",
@@ -66,7 +68,8 @@
       "excluded": false,
       "other_ports": [
         23
-      ]
+      ],
+      "endpoints": []
     },
     {
       "address": "10.42.7.21",
@@ -86,7 +89,8 @@
       },
       "in_scope": true,
       "excluded": false,
-      "other_ports": []
+      "other_ports": [],
+      "endpoints": []
     },
     {
       "address": "10.42.7.22",
@@ -102,7 +106,8 @@
       "identification": {},
       "in_scope": true,
       "excluded": false,
-      "other_ports": []
+      "other_ports": [],
+      "endpoints": []
     },
     {
       "address": "10.42.7.30",
@@ -120,7 +125,54 @@
       },
       "in_scope": true,
       "excluded": false,
-      "other_ports": []
+      "other_ports": [],
+      "endpoints": []
+    },
+    {
+      "address": "10.42.7.40",
+      "roles": [
+        "server"
+      ],
+      "protocols": [
+        "opcua"
+      ],
+      "unit_ids": [],
+      "identification": {
+        "application_name": "Line 3 gateway",
+        "application_uri": "urn:line3:gateway",
+        "product_uri": "urn:vendor:uagateway"
+      },
+      "in_scope": true,
+      "excluded": false,
+      "other_ports": [],
+      "endpoints": [
+        {
+          "url": "opc.tcp://10.42.7.40:4840",
+          "mode": "None",
+          "policy": "None",
+          "tokens": [
+            "anonymous",
+            "username"
+          ]
+        },
+        {
+          "url": "opc.tcp://10.42.7.40:4840",
+          "mode": "Sign",
+          "policy": "Basic128Rsa15",
+          "tokens": [
+            "username"
+          ]
+        },
+        {
+          "url": "opc.tcp://10.42.7.40:4840",
+          "mode": "SignAndEncrypt",
+          "policy": "Basic256Sha256",
+          "tokens": [
+            "username",
+            "certificate"
+          ]
+        }
+      ]
     },
     {
       "address": "10.42.9.80",
@@ -132,7 +184,8 @@
       "identification": {},
       "in_scope": false,
       "excluded": false,
-      "other_ports": []
+      "other_ports": [],
+      "endpoints": []
     }
   ],
   "conversations": [
@@ -156,7 +209,23 @@
       "first_seen": "2023-11-14T22:13:20Z",
       "last_seen": "2023-11-14T22:13:50.005000Z",
       "mean_interval_ms": 750.0,
-      "jitter_ms": 0.0
+      "jitter_ms": 0.0,
+      "unanswered": 0,
+      "response_ms_mean": 4.024,
+      "response_ms_max": 5.0,
+      "written": {
+        "unit 1 holding registers": [
+          [
+            100,
+            100
+          ]
+        ]
+      },
+      "written_nodes": [],
+      "security_policies": {},
+      "unsecured_requests": 0,
+      "identity_tokens": {},
+      "cleartext_users": []
     },
     {
       "client": "10.42.9.80",
@@ -177,7 +246,23 @@
       "first_seen": "2023-11-14T22:13:51.005000Z",
       "last_seen": "2023-11-14T22:13:51.011000Z",
       "mean_interval_ms": null,
-      "jitter_ms": null
+      "jitter_ms": null,
+      "unanswered": 0,
+      "response_ms_mean": 6.0,
+      "response_ms_max": 6.0,
+      "written": {
+        "unit 1 holding registers": [
+          [
+            100,
+            100
+          ]
+        ]
+      },
+      "written_nodes": [],
+      "security_policies": {},
+      "unsecured_requests": 0,
+      "identity_tokens": {},
+      "cleartext_users": []
     },
     {
       "client": "10.42.7.10",
@@ -199,7 +284,16 @@
       "first_seen": "2023-11-14T22:13:20.250000Z",
       "last_seen": "2023-11-14T22:13:51.519000Z",
       "mean_interval_ms": 781.525,
-      "jitter_ms": 196.874
+      "jitter_ms": 196.874,
+      "unanswered": 0,
+      "response_ms_mean": 4.098,
+      "response_ms_max": 8.0,
+      "written": {},
+      "written_nodes": [],
+      "security_policies": {},
+      "unsecured_requests": 0,
+      "identity_tokens": {},
+      "cleartext_users": []
     },
     {
       "client": "10.42.7.10",
@@ -217,12 +311,21 @@
         "read holding registers": 40
       },
       "exceptions": {
-        "illegal data address": 20
+        "illegal data address on read holding registers": 20
       },
       "first_seen": "2023-11-14T22:13:20.500000Z",
       "last_seen": "2023-11-14T22:13:49.754000Z",
       "mean_interval_ms": 750.0,
-      "jitter_ms": 0.0
+      "jitter_ms": 0.0,
+      "unanswered": 0,
+      "response_ms_mean": 4.0,
+      "response_ms_max": 4.0,
+      "written": {},
+      "written_nodes": [],
+      "security_policies": {},
+      "unsecured_requests": 0,
+      "identity_tokens": {},
+      "cleartext_users": []
     },
     {
       "client": "10.42.7.11",
@@ -243,7 +346,90 @@
       "first_seen": "2023-11-14T22:13:52.019000Z",
       "last_seen": "2023-11-14T22:13:52.869000Z",
       "mean_interval_ms": 415.0,
-      "jitter_ms": 205.0
+      "jitter_ms": 205.0,
+      "unanswered": 0,
+      "response_ms_mean": 16.667,
+      "response_ms_max": 20.0,
+      "written": {},
+      "written_nodes": [],
+      "security_policies": {},
+      "unsecured_requests": 0,
+      "identity_tokens": {},
+      "cleartext_users": []
+    },
+    {
+      "client": "10.42.7.10",
+      "server": "10.42.7.40",
+      "port": 4840,
+      "protocol": "opcua",
+      "requests": 11,
+      "responses": 11,
+      "writes": 1,
+      "controls": 0,
+      "unit_ids": [],
+      "functions": {
+        "activate session": 1,
+        "create session": 1,
+        "get endpoints": 1,
+        "hello": 1,
+        "open secure channel": 1,
+        "read": 5,
+        "write": 1
+      },
+      "exceptions": {},
+      "first_seen": "2023-11-14T22:13:53.919000Z",
+      "last_seen": "2023-11-14T22:13:59.029000Z",
+      "mean_interval_ms": 510.0,
+      "jitter_ms": 0.0,
+      "unanswered": 0,
+      "response_ms_mean": 10.0,
+      "response_ms_max": 10.0,
+      "written": {},
+      "written_nodes": [
+        "ns=2;s=Line3.Setpoint"
+      ],
+      "security_policies": {
+        "None": 1
+      },
+      "unsecured_requests": 8,
+      "identity_tokens": {
+        "username": 1
+      },
+      "cleartext_users": [
+        "supervision"
+      ]
+    },
+    {
+      "client": "10.42.7.11",
+      "server": "10.42.7.40",
+      "port": 4840,
+      "protocol": "opcua",
+      "requests": 6,
+      "responses": 6,
+      "writes": 0,
+      "controls": 0,
+      "unit_ids": [],
+      "functions": {
+        "encrypted message": 4,
+        "hello": 1,
+        "open secure channel": 1
+      },
+      "exceptions": {},
+      "first_seen": "2023-11-14T22:13:59.529000Z",
+      "last_seen": "2023-11-14T22:14:02.089000Z",
+      "mean_interval_ms": 510.0,
+      "jitter_ms": 0.0,
+      "unanswered": 0,
+      "response_ms_mean": 10.0,
+      "response_ms_max": 10.0,
+      "written": {},
+      "written_nodes": [],
+      "security_policies": {
+        "Basic256Sha256": 1
+      },
+      "unsecured_requests": 0,
+      "identity_tokens": {},
+      "cleartext_users": []
     }
   ],
   "findings": [
@@ -255,7 +441,8 @@
         "10.42.7.20"
       ],
       "evidence": [
-        "10.42.7.20 written by 10.42.7.10, 10.42.9.80"
+        "10.42.7.20 written by 10.42.7.10, 10.42.9.80",
+        "10.42.7.10 and 10.42.9.80 both write unit 1 holding registers 100"
       ],
       "iec_62443": [
         "CR 2.1"
@@ -287,6 +474,26 @@
       "recommendation": "Disable the services that are not required for operation. Where an HMI or a gateway genuinely needs them, restrict the source addresses and stop using the ones that carry credentials in clear."
     },
     {
+      "identifier": "OT-017",
+      "title": "OPC UA passwords sent without encryption",
+      "severity": "high",
+      "assets": [
+        "10.42.7.40"
+      ],
+      "evidence": [
+        "10.42.7.10 -> 10.42.7.40:4840 - password of 'supervision' readable in the capture"
+      ],
+      "iec_62443": [
+        "CR 1.5",
+        "CR 4.1"
+      ],
+      "anssi": [
+        "Mesure 12 (gestion des droits)",
+        "Mesure 19 (protocoles)"
+      ],
+      "recommendation": "The password is in the capture file itself: change it, and handle the capture as a credential until it is deleted. Then make sure passwords leave the client encrypted, either on a SignAndEncrypt channel or through a user token policy with its own security policy."
+    },
+    {
       "identifier": "OT-001",
       "title": "Control traffic carried without authentication or integrity protection",
       "severity": "medium",
@@ -316,12 +523,14 @@
       "severity": "medium",
       "assets": [
         "10.42.7.20",
-        "10.42.7.30"
+        "10.42.7.30",
+        "10.42.7.40"
       ],
       "evidence": [
-        "10.42.7.10 -> 10.42.7.20:502 - 1 write requests",
-        "10.42.9.80 -> 10.42.7.20:502 - 1 write requests",
-        "10.42.7.11 -> 10.42.7.30:102 - 1 write requests"
+        "10.42.7.10 -> 10.42.7.20:502 - 1 write requests (unit 1 holding registers 100)",
+        "10.42.9.80 -> 10.42.7.20:502 - 1 write requests (unit 1 holding registers 100)",
+        "10.42.7.11 -> 10.42.7.30:102 - 1 write requests",
+        "10.42.7.10 -> 10.42.7.40:4840 - 1 write requests (ns=2;s=Line3.Setpoint)"
       ],
       "iec_62443": [
         "CR 1.2",
@@ -330,7 +539,7 @@
       "anssi": [
         "Mesure 12 (gestion des droits)"
       ],
-      "recommendation": "Confirm with the operator that each writing host is a legitimate controller. Any host able to reach port 502 or 102 can issue the same requests, so the control list is whatever the firewall allows, not what the application intends."
+      "recommendation": "Confirm with the operator that each writing host is a legitimate controller. Any host able to reach port 102 or 502 or 4840 can issue the same requests, so the control list is whatever the firewall allows, not what the application intends."
     },
     {
       "identifier": "OT-005",
@@ -351,6 +560,45 @@
       "recommendation": "The asset inventory used to write the scope does not match the traffic. Reconcile before drawing any conclusion from the rest of this report: an audit that missed a device also missed its exposure."
     },
     {
+      "identifier": "OT-014",
+      "title": "OPC UA used without signing or encryption",
+      "severity": "medium",
+      "assets": [
+        "10.42.7.40"
+      ],
+      "evidence": [
+        "10.42.7.10 -> 10.42.7.40:4840 - 8 requests on a secure channel with security policy None",
+        "10.42.7.40 offers opc.tcp://10.42.7.40:4840 with security mode None"
+      ],
+      "iec_62443": [
+        "CR 3.1",
+        "CR 4.1"
+      ],
+      "anssi": [
+        "Mesure 19 (protocoles)"
+      ],
+      "recommendation": "OPC UA can sign and encrypt every message; these exchanges did neither, and are as open to reading and tampering as Modbus. Move the clients to SignAndEncrypt endpoints with Basic256Sha256 or a newer policy, then remove the None endpoint from the server. Discovery over policy None (GetEndpoints, FindServers) is what the specification expects and is not counted here."
+    },
+    {
+      "identifier": "OT-016",
+      "title": "OPC UA sessions without user authentication",
+      "severity": "medium",
+      "assets": [
+        "10.42.7.40"
+      ],
+      "evidence": [
+        "10.42.7.40 accepts anonymous users on opc.tcp://10.42.7.40:4840"
+      ],
+      "iec_62443": [
+        "CR 1.1",
+        "CR 2.1"
+      ],
+      "anssi": [
+        "Mesure 12 (gestion des droits)"
+      ],
+      "recommendation": "An anonymous session gets whatever the server grants to everyone, which on many servers includes writing. Disable the anonymous token, or restrict the anonymous role to reading, and give each client its own user or certificate."
+    },
+    {
       "identifier": "OT-007",
       "title": "Recurrent protocol exceptions",
       "severity": "low",
@@ -358,7 +606,7 @@
         "10.42.7.22"
       ],
       "evidence": [
-        "10.42.7.10 -> 10.42.7.22:502 - 50% of responses are exceptions (illegal data address x20)"
+        "10.42.7.10 -> 10.42.7.22:502 - 50% of responses are exceptions (illegal data address on read holding registers x20)"
       ],
       "iec_62443": [
         "CR 7.2"
@@ -374,11 +622,13 @@
       "severity": "low",
       "assets": [
         "10.42.7.21",
-        "10.42.7.30"
+        "10.42.7.30",
+        "10.42.7.40"
       ],
       "evidence": [
         "10.42.7.21: product=TM241CE40R, revision=5.1.9.9, vendor=Schneider Electric",
-        "10.42.7.30: article_number=6ES7 214-1AG40-0XB0, module_type=CPU 1214C DC/DC/DC, plc_name=LINE2_CPU"
+        "10.42.7.30: article_number=6ES7 214-1AG40-0XB0, module_type=CPU 1214C DC/DC/DC, plc_name=LINE2_CPU",
+        "10.42.7.40: application_name=Line 3 gateway, application_uri=urn:line3:gateway, product_uri=urn:vendor:uagateway"
       ],
       "iec_62443": [
         "CR 1.2"
@@ -388,7 +638,25 @@
         "Mesure 20 (veille vulnérabilités)"
       ],
       "recommendation": "Identification cannot be turned off on these protocols, and it is useful to you as much as to an attacker. Use it: match each order number and firmware version against the CISA ICS advisories and the vendor bulletins, and record the result in the asset inventory."
+    },
+    {
+      "identifier": "OT-015",
+      "title": "Deprecated OPC UA security policies",
+      "severity": "low",
+      "assets": [
+        "10.42.7.40"
+      ],
+      "evidence": [
+        "10.42.7.40 offers opc.tcp://10.42.7.40:4840 with Basic128Rsa15"
+      ],
+      "iec_62443": [
+        "CR 4.3"
+      ],
+      "anssi": [
+        "Mesure 19 (protocoles)"
+      ],
+      "recommendation": "Basic128Rsa15 and Basic256 rely on SHA-1 and were deprecated by the OPC Foundation. Disable them on the server once every client supports Basic256Sha256 or one of the Aes policies."
     }
   ],
-  "generated_at": "2026-09-21T11:47:06.696273Z"
+  "generated_at": "2026-10-27T17:23:07.622820Z"
 }

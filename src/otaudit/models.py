@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class Protocol(StrEnum):
     MODBUS = "modbus"
     S7COMM = "s7comm"
+    OPCUA = "opcua"
 
 
 class Severity(StrEnum):
@@ -71,6 +72,17 @@ class Scope(BaseModel):
         return any(address in network for network in self.exclusions)
 
 
+class Endpoint(BaseModel):
+    """An OPC UA endpoint as a server described it in a GetEndpoints response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    url: str
+    mode: str
+    policy: str
+    tokens: list[str] = Field(default_factory=list)
+
+
 class Device(BaseModel):
     address: IPv4Address
     roles: list[str] = Field(default_factory=list)
@@ -80,6 +92,7 @@ class Device(BaseModel):
     in_scope: bool = True
     excluded: bool = False
     other_ports: list[int] = Field(default_factory=list)
+    endpoints: list[Endpoint] = Field(default_factory=list)
 
 
 class Conversation(BaseModel):
@@ -104,6 +117,16 @@ class Conversation(BaseModel):
     response_ms_max: float | None = None
     written: dict[str, list[tuple[int, int]]] = Field(default_factory=dict)
     """Inclusive address ranges written, keyed by unit and table ("unit 1 coils")."""
+    written_nodes: list[str] = Field(default_factory=list)
+    """OPC UA nodes written, as "ns=3;s=Line1.Setpoint"."""
+    security_policies: dict[str, int] = Field(default_factory=dict)
+    """OPC UA secure channels opened, by security policy."""
+    unsecured_requests: int = 0
+    """OPC UA requests other than discovery carried on a channel with policy None."""
+    identity_tokens: dict[str, int] = Field(default_factory=dict)
+    """OPC UA session activations, by user identity token type."""
+    cleartext_users: list[str] = Field(default_factory=list)
+    """Users whose password was sent without encryption. The password is never kept."""
 
     @property
     def written_ranges(self) -> list[str]:

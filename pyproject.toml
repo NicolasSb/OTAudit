@@ -5,12 +5,12 @@ build-backend = "hatchling.build"
 [project]
 name = "otaudit"
 version = "0.1.0"
-description = "Passive audit of Modbus/TCP and S7comm traffic captures"
+description = "Passive audit of Modbus/TCP, S7comm and OPC UA traffic captures"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Nicolas Sourbier" }]
-keywords = ["modbus", "s7comm", "ics", "ot-security", "iec-62443", "pcap"]
+keywords = ["modbus", "s7comm", "opc-ua", "ics", "ot-security", "iec-62443", "pcap"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Information Technology",
